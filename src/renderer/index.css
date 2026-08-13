@@ -1,0 +1,176 @@
+:root {
+    --color1: #5E0006;
+    --color2: #9B0F06;
+    --color3: #D53E0F;
+    --color4: #EED9B9;
+    --textColor1: black;
+    --tectColor2: darkgray;
+    --textcolor3: lightgrey;
+}
+
+html, body {
+    margin: 0;
+    height: 100%;
+    min-height: 100%;
+}
+
+div {
+  border: 0px;
+  font-family: Helvetica;
+  font-weight: normal;
+}
+
+header,
+footer {
+    flex: none;
+}
+
+button {
+    background-color: var(--color1);
+    color: var(--color4);
+}
+
+button:hover {
+  background-color: var(--color3) !important;
+  color: white !important;
+  cursor: pointer; /* Changes the arrow to a hand */
+}
+
+canvas {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    background-color: white;
+}
+
+video {
+    display: none;
+}
+
+/*
+ * classes
+ */
+
+.tableCol {
+    border: 0px;
+    display: flex;
+    flex-direction: column;
+}
+
+.tableRow {
+    border: 0px;
+    display: flex;
+    flex-direction: row;
+}
+
+.tableElem {
+    flex: 1 1 0;
+    /*border: 1px solid #031424;*/
+    text-align: center;
+    padding: 0px;
+    margin: 0px;
+}
+
+.tableElemText {
+    flex: 1 1 0;
+    /*flex-grow: 1;*/
+    border: 1px solid #031424;
+    text-align: center;
+    padding: 4px;
+    margin: 1px;
+}
+
+.tableElemLeftText {
+    flex: 1 1 0;
+    /*flex-grow: 1;*/
+    border: 1px solid #031424;
+    text-align: left;
+    padding: 4px;
+    margin: 1px;
+}
+
+.tableElemInput {
+    flex: 1 1 0;
+    border: 1px solid #031424;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.tableElemBtn {
+    flex: 1 1 0;
+    border: 1px solid #031424;
+    text-align: center;
+    padding: 0.4%;
+    margin: 0.1%;
+    font-size: 0.7em;
+}
+
+.tableElemBtn2 {
+    flex: 0.3 1 0;
+    border: 1px solid #031424;
+    text-align: center;
+    padding: 0.4%;
+    margin: 0.1%;
+    font-size: 0.7em;
+    background-color: var(--color4);
+    color: var(--color1);
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 6px;
+    /* Position the tooltip text - see examples below! */
+    position: absolute;
+    z-index: 1;
+}
+
+/*
+ * IDs
+ */
+
+#btnLine {
+    background-color: var(--color4);
+    position: absolute;
+    top: 0%;
+    left: 0%;
+    width: 100%;
+    height: 5%;
+    font-family: Helvetica;
+    font-weight: normal;
+    font-size: 1.5em;
+}
+
+#mainFrame {
+    background-color: var(--color4);
+    position: absolute;
+    top: 5%;
+    left: 0%;
+    width: 100%;
+    height: 90%;
+    font-family: Helvetica;
+    font-weight: normal;
+    font-size: 1.5em;
+}
+
+#footLine {
+    background-color: var(--color2);
+    color: var(--color4);
+    position: absolute;
+    top: 95%;
+    left: 0%;
+    width: 100%;
+    height: 5%;
+    font-family: Helvetica;
+    font-weight: normal;
+    font-size: 1.0em;
+
+}
+ #footRight {
+    font-size: 0.5em;
+ }

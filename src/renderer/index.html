@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <meta
+      http-equiv="X-Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <title>CV Test App</title>
+    <link rel="stylesheet" type="text/css" href="index.css">
+  </head>
+  <body>
+    <div id="btnLine" class="tableRow">
+      <button id="InputBtn" class="tableElemBtn">Input</button>
+      <button id="lastBtn" class="tableElemBtn2">&larr;</button>
+      <button id="runBtn" class="tableElemBtn2">&#9654;</button>
+      <button id="nextBtn" class="tableElemBtn2">&rarr;</button>  
+      <button id="resetBtn" class="tableElemBtn2">&#8635;</button>  
+    </div>
+    <div id="mainFrame">
+      <canvas id="incv"></canvas>
+    </div>
+    <div id="footLine" class="tableRow">
+      <div id="footLeft" class="tableElem">xxx</div>
+      <div id="footCenter" class="tableElem"></div>
+      <div id="footRight" class="tableElem">
+        <label for="Disp">disp:</label>
+        <progress id="DispBar" value="0" max="100"> 0% </progress>
+      </div>
+    </div>
+   
+  </body>
+  <script src="./imgdisp.js"></script>
+  <script src="./renderer.js"></script>
+</html>

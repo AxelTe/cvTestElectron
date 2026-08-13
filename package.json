@@ -1,0 +1,27 @@
+{
+  "name": "3dreconstruct",
+  "version": "1.0.0",
+  "description": "3d reconstruction from 2d camera images",
+  "main": "src/main/main.js",
+  "scripts": {
+    "rebuild": "electron-rebuild -f -w my_addon --debug",
+    "start": "npm run rebuild && electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs": "jsdoc -c conf.json"
+  },
+  "author": "Axel Techmer",
+  "license": "ISC",
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "docdash": "^2.0.2",
+    "electron": "^41.0.4",
+    "jsdoc": "^4.0.5",
+    "node-gyp": "^13.0.1"
+  },
+  "dependencies": {
+    "@vingle/bmp-js": "^0.2.5",
+    "log-timestamp": "^0.3.0",
+    "node-addon-api": "^8.9.1",
+    "sharp": "^0.34.5"
+  }
+}
