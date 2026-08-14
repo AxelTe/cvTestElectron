@@ -4,7 +4,9 @@ const path = require('node:path');
 const fs = require('node:fs');
 require('log-timestamp');
 
-let config = require('../main/config.json');
+let configFile = path.join(__dirname, '../main/config.json');
+console.log(configFile);
+let config = JSON.parse( fs.readFileSync(configFile));
 let imgseq = require('../main/imgseq.js');
 
 const template = [
@@ -76,6 +78,7 @@ const createWindow = () => {
 app.whenReady().then(() => {
   console.log("on: whenReady");
   console.log(`=== Main Process PID: ${process.pid} ===`);
+  console.log(__dirname);
 
   // Menü registrieren
   const menu = Menu.buildFromTemplate(template);
@@ -129,9 +132,9 @@ ipcMain.handle('dialog:openFile', async () => {
       config.imgseq.seqname = tstr1[tstr1.length - 1];
       imgseq.start(config.imgseq);
       try {
-        fs.writeFileSync("config1.json", JSON.stringify(config));
+        fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
       } catch (error) {
-        sendErrorToUI("can not write ../main/config.json");
+        sendErrorToUI("can not write "+configFile);
       }
     }
     return filePaths; // Gibt die Pfade an das Frontend zurück

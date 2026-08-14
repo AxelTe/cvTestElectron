@@ -65,7 +65,8 @@ class imgdisp {
         
         let loadFromRootEvent = new CustomEvent('loadFromRoot',{ 
             bubbles: true, 
-            detail: { msg: {id: this.id, cols: this.wd, rows: this.hd} } 
+            //detail: { msg: {id: this.id, cols: this.wd, rows: this.hd} } 
+            detail: { msg: {id: this.id, cols: this.cols, rows: this.rows} } 
         });
         this.cv.dispatchEvent(loadFromRootEvent);
     }

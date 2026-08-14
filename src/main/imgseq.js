@@ -70,6 +70,18 @@ class imgseq extends EventEmitter {
                 return
             }
             console.log("imgseq.start: ", this.seqinfo);
+            
+            this.rows = this.seqinfo.rows;
+            this.cols = this.seqinfo.cols;
+            try {
+
+                const result = myAddon.initialize(this.rows, this.cols);
+                console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
+                
+            } catch (error) {
+                console.log("imgseq.loadImg()> Error: ", error);
+            }
+
             this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo, ptime: 0 });
         });
     }
@@ -81,17 +93,6 @@ class imgseq extends EventEmitter {
      * @returns {void}
      */
     loadImg(id, cv_rows, cv_cols) {
-        if (this.rows !== cv_rows || this.cols !== cv_cols) {
-            console.log("imgseq.loadImg()> display size of renderer changed!!!");
-            try {
-                const result = myAddon.initialize(cv_rows, cv_cols);
-                console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
-                this.rows = cv_rows;
-                this.cols = cv_cols;
-            } catch (error) {
-                console.log("imgseq.loadImg()> Error: ", error);
-            }
-        }
 
         let t0 = Date.now();
         let tid = this.seqinfo.start + id;
@@ -104,10 +105,10 @@ class imgseq extends EventEmitter {
         switch (this.seqinfo.suffix) {
             case "jpg":
                 sharp(fname)
-                    .resize(cv_cols, cv_rows, {
-                        kernel: sharp.kernel.nearest,
-                        fit: 'fill',
-                    })
+                    //.resize(cv_cols, cv_rows, {
+                    //    kernel: sharp.kernel.nearest,
+                    //    fit: 'fill',
+                    //})
                     .ensureAlpha() // Garantiert 4 Kanäle (Rot, Grün, Blau, Alpha)
                     .raw()
                     .toBuffer({ resolveWithObject: true })

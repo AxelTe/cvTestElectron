@@ -5,7 +5,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "rebuild": "electron-rebuild -f -w my_addon --debug",
-    "start": "npm run rebuild && electron .",
+    "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "docs": "jsdoc -c conf.json"
   },
