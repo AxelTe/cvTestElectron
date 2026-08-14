@@ -18,13 +18,11 @@
  * Note: Both images will be thinned during processing.
  */
 
-uint32_t cvtEdgDetection(std::vector<grad32F> &gradI, std::vector<edgPtF> &edges, float th, uint32_t rows, uint32_t cols)
+uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> &edges, float th, uint32_t rows, uint32_t cols)
 {
-    // float *mp0, *mp1, *mp2;
-    // float *dp;
     float aF, mF1, mF2;
     uint32_t cnt = 0;
-    uint32_t c, c0, c1, u, v, size;
+    uint32_t c, c0, c1, size;
 
     // work
     //
@@ -86,12 +84,12 @@ uint32_t cvtEdgDetection(std::vector<grad32F> &gradI, std::vector<edgPtF> &edges
     cnt = 0;
     for (c = c0; c < c1; c++)
     {
-        if (gradI[c].edg>0)
+        if (gradI[c].edg > 0)
         {
             if (cnt < edges.size())
             {
-                edges[cnt].x = c%cols;
-                edges[cnt].y = c/cols;
+                edges[cnt].x = c % cols;
+                edges[cnt].y = c / cols;
                 edges[cnt].mag = gradI[c].mag;
                 edges[cnt].dir = gradI[c].dir;
                 cnt++;
@@ -105,18 +103,18 @@ uint32_t cvtEdgDetection(std::vector<grad32F> &gradI, std::vector<edgPtF> &edges
 /**
  *
  */
-void cvtEdg2RGBA(std::vector<grad32F> &gradI32F, uint8_t *outRGBA, uint32_t size)
+void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size)
 {
     uint32_t channels = 4;
     for (uint32_t i = 0, j = 0; i < size; i++)
     {
-        if(gradI32F[i].edg>0){
+        if (gradI32F[i].edg > 0)
+        {
             outRGBA[j] = 255;
             outRGBA[j + 1] = 0;
-            outRGBA[j + 2] = 0; 
+            outRGBA[j + 2] = 0;
         }
         j = j + channels;
-
     }
 }
 
@@ -148,7 +146,7 @@ void cvtGauss5x5(
     uint32_t rows,
     uint32_t cols)
 {
-    uint32_t r, c, size, c0, c1;
+    uint32_t c, size, c0, c1;
     float val;
 
     size = rows * cols;
@@ -186,7 +184,7 @@ void cvtGauss5x5(
  */
 float cvtGrad(
     std::vector<float> &inI32F,
-    std::vector<grad32F> &gradI32F,
+    std::vector<grad_float> &gradI32F,
     float th,
     uint32_t rows,
     uint32_t cols)
@@ -244,7 +242,7 @@ void cvtInitGMask32F(float sigma, std::vector<float> &gmask32F, uint32_t size)
 /**
  *
  */
-void cvtMag2RGBA(std::vector<grad32F> &gradI32F, uint8_t *outRGBA, uint32_t size)
+void cvtMag2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size)
 {
     float g;
     uint32_t channels = 4;
@@ -275,4 +273,22 @@ void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
         j = j + channels;
         greyI32F[i] = 0.2989 * r + 0.5870 * g + 0.1140 * b;
     }
+}
+
+/**
+ *
+ */
+void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t cols, uint32_t nofLevels)
+{
+    uint32_t i, size = rows * cols * 2;
+    //
+    for(i=0; i<nofLevels; i++){
+        size = rows * (cols>>i);
+        iLevelL[i].tmpI_float.resize(size, 0);
+        iLevelL[i].greyI_float.resize(size, 0);
+        iLevelL[i].gaussI_float.resize(size, 0);
+        iLevelL[i].gradI_float.resize(size);
+        iLevelL[i].edgL_float.resize(size);
+    }
+
 }

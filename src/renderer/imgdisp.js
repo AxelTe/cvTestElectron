@@ -4,7 +4,7 @@
  * @emits loadFromRootEvent Customevent
  */
 class imgdisp {
-
+    #t0 = 0;
     /**
      * 
      * @param {object} cv DOM-id of canvas object
@@ -28,17 +28,30 @@ class imgdisp {
         this.end = 0;
         this.id = 0;
         this.dispQueueTimer = null;
+        
+        const ctx = this.cv.getContext('2d');
+        ctx.font = '30px Arial';
+        ctx.fillStyle = '#2b2b2b';      // Text color
+        ctx.textAlign = 'left';        // Options: left, right, center, start, end
+        ctx.textBaseline = 'bottom';     // Options: top, hanging, middle, alphabetic, ideographic, bottom
     }
 
     /**
      * 
      * @param {Uint8Array} img 
      */
-    dispImg( imgU8Array ){
+    dispImg( imgU8Array , pTimes){
         const ctx = this.cv.getContext('2d');
         const clampedArray = new Uint8ClampedArray(imgU8Array); //.data);
-        const imageData = new ImageData(clampedArray, this.wd, this.hd);
+        const imageData = new ImageData(clampedArray, this.cols, this.rows);
         ctx.putImageData(imageData, 0, 0);
+        //
+        let tstr = "Proc. time: ";
+        tstr = tstr + pTimes[0].min + ".."+pTimes[0].val+".."+pTimes[0].max;
+        tstr = tstr + ", "+pTimes[1].min + ".."+pTimes[1].val+".."+pTimes[1].max;
+        tstr = tstr + ", "+(Date.now() - this.#t0);
+        ctx.fillText(tstr, 2, this.hd -2 );
+        //
         if( (this.end-this.start)<=this.id){
             clearInterval(this.dispQueueTimer);
             this.dispQueueTimer = null
@@ -62,7 +75,7 @@ class imgdisp {
 
     loadImgFrommRoot(){
         console.log("loadImgFrommRoot");
-        
+        this.#t0 = Date.now();
         let loadFromRootEvent = new CustomEvent('loadFromRoot',{ 
             bubbles: true, 
             //detail: { msg: {id: this.id, cols: this.wd, rows: this.hd} } 

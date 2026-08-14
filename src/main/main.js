@@ -185,12 +185,15 @@ ipcMain.on('loadFromRoot', (event, data) => {
   //
 
   imgseq.on("imgseqInfo", function (msg) {
-    if (msg.hasOwnProperty("loadImg")) {
+    if (msg.hasOwnProperty("loadTime")) {
       imgseq.processImg();
       sendInfoToUI(msg);
     }
-    if (msg.hasOwnProperty("processImg")) {
-
+    if (msg.hasOwnProperty("processTime")) {
+      sendInfoToUI(msg);
+    }
+    if (msg.hasOwnProperty("img")) {
+      sendInfoToUI(msg);
     }
     if (msg.hasOwnProperty("seqname")) {
       sendInfoToUI(msg);

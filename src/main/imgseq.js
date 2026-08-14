@@ -26,7 +26,6 @@ class imgseq extends EventEmitter {
         this.#imgInfo = undefined;
         this.rows = 0;
         this.cols = 0;
-
         this.id = -1;
     }
 
@@ -71,18 +70,16 @@ class imgseq extends EventEmitter {
             }
             console.log("imgseq.start: ", this.seqinfo);
             
-            this.rows = this.seqinfo.rows;
-            this.cols = this.seqinfo.cols;
             try {
 
-                const result = myAddon.initialize(this.rows, this.cols);
+                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols);
                 console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
                 
             } catch (error) {
                 console.log("imgseq.loadImg()> Error: ", error);
             }
 
-            this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo, ptime: 0 });
+            this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo});
         });
     }
 
@@ -95,12 +92,12 @@ class imgseq extends EventEmitter {
     loadImg(id, cv_rows, cv_cols) {
 
         let t0 = Date.now();
-        let tid = this.seqinfo.start + id;
-        if (tid > this.seqinfo.end) {
-            this.emit("imgseqError", "id > seqinfo.end: " + tid + ", " + this.seqinfo.end);
+        this.id = this.seqinfo.start + id;
+        if (this.id > this.seqinfo.end) {
+            this.emit("imgseqError", "id > seqinfo.end: " + this.id + ", " + this.seqinfo.end);
             return
         }
-        let fname = this.path + "\\" + this.seqinfo.prefix + tid + "." + this.seqinfo.suffix;
+        let fname = this.path + "\\" + this.seqinfo.prefix + this.id + "." + this.seqinfo.suffix;
         console.log("imgseq.loadImg()> ", fname);
         switch (this.seqinfo.suffix) {
             case "jpg":
@@ -115,7 +112,7 @@ class imgseq extends EventEmitter {
                     .then(({ data, info }) => {
                         this.#imgD = data;
                         this.#imgInfo = info;
-                        this.emit("imgseqInfo", { loadImg: true, info: info, img: data, ptime: Date.now() - t0 });
+                        this.emit("imgseqInfo", { loadTime: Date.now() - t0 });
                     })
                     .catch(err => {
                         this.emit("imgseqError", err);
@@ -142,7 +139,7 @@ class imgseq extends EventEmitter {
                     .then(({ data, info }) => {
                         this.#imgD = data;
                         this.#imgInfo = info;
-                        this.emit("imgseqInfo", { loadImg: true, info: info, img: data, ptime: Date.now() - t0 });
+                        this.emit("imgseqInfo", { loadTime: Date.now() - t0 });
                     })
                     .catch(err => {
                         this.emit("imgseqError", err);
@@ -166,7 +163,15 @@ class imgseq extends EventEmitter {
                 this.#imgInfo.channels
             );
             console.log("imgseq.processImg> myAddon.process() retruned:", result);
-            this.emit("imgseqInfo", { processImg: true, ptime: Date.now() - t0 });
+            // send processing time to renderer
+            this.emit("imgseqInfo", { processTime: Date.now() - t0 });
+            // send image to renderer
+            this.emit("imgseqInfo", { 
+                img: this.#imgD, 
+                rows: this.#imgInfo.height, 
+                cols: this.#imgInfo.width,
+                channels: this.#imgInfo.channels,
+                id: this.id });
         } catch (error) {
             console.log("imgseq.processImg> Error: ", error);
         }

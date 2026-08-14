@@ -12,7 +12,7 @@ const infoId = document.getElementById('info')
 let cv = document.getElementById('incv');
 let tid = document.getElementById('mainFrame')
 let imgDisp = new imgdisp(cv, tid.clientWidth, tid.clientHeight);
-let ptimes = new Array(10);
+let ptimes = new Array(5);
 for(let i=0; i<ptimes.length; i++){
   ptimes[i] = {min: 1000, max:0, val: 0};
 }
@@ -102,26 +102,40 @@ window.electronAPI.onFehler((meldung) => {
 
 window.electronAPI.onInfo((msg) => {
   if (msg.hasOwnProperty("seqinfo")) {
+    console.log("seqInfo")
     let el = document.getElementById("DispBar");
     el.min = msg.seqinfo.start;
     el.max = msg.seqinfo.end;
     imgDisp.seqInfo(msg.seqinfo);
   }
 
+  if (msg.hasOwnProperty("loadTime")) {
+    console.log("loadTime");
+    let tt = msg.loadTime;
+    ptimes[0].min = ptimes[0].min > tt ? tt : ptimes[0].min;
+    ptimes[0].max = ptimes[0].max < tt ? tt : ptimes[0].max;
+    ptimes[0].val = tt;
+  }
+
+  if (msg.hasOwnProperty("processTime")) {
+    console.log("processTime");
+    let tt = msg.processTime;
+    ptimes[1].min = ptimes[1].min > tt ? tt : ptimes[1].min;
+    ptimes[1].max = ptimes[1].max < tt ? tt : ptimes[1].max;
+    ptimes[1].val = tt;
+  }
+
   if (msg.hasOwnProperty("seqname")) {
+    console.log("seqname");
     const el = document.getElementById("footCenter");
     el.innerText = msg.seqname;
   }
 
   if (msg.hasOwnProperty("img")) {
+    console.log("img");
     let el = document.getElementById("DispBar");
     el.value = imgDisp.id;
-    ptimes[0].min =  ptimes[0].min > msg.ptime ? msg.ptime : ptimes[0].min;
-    ptimes[0].max =  ptimes[0].max < msg.ptime ? msg.ptime : ptimes[0].max;
-    ptimes[0].val = msg.ptime;
-    el = document.getElementById("footLeft");
-    el.innerText = ptimes[0].min+".."+ptimes[0].val+".."+ptimes[0].max;
-    imgDisp.dispImg(msg.img);
+    imgDisp.dispImg(msg.img, ptimes);
   }
 
 });
