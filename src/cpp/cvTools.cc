@@ -195,7 +195,7 @@ float cvtGrad(
     float mmax = 0;
     uint32_t c0, c1, c, size = rows * cols;
 
-    std::fill(gradI32F.begin(), gradI32F.end(), grad32F{0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+    std::fill(gradI32F.begin(), gradI32F.end(), grad_float{0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
     // work
     c0 = cols + 1;
     c1 = size - cols - 2;
@@ -291,4 +291,58 @@ void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t co
         iLevelL[i].edgL_float.resize(size);
     }
 
+}
+
+/**
+ * 
+ */
+void cvtSubSample(std::vector<float> &inI, std::vector<float> &outI, uint32_t rows, uint32_t cols){
+    uint32_t i, size = rows*cols;
+    uint32_t i2,rows2, cols2, size2;
+    float tv;
+
+    if(size > outI.size()) return;
+    cols2 = cols*2;
+    rows2 = rows*2;
+    size2 = rows2*cols2;
+    if(size2 > inI.size()) return;
+
+    for(i=0;i<size;i++){
+        if( (i%cols) == 0){
+            i2 = (i/cols)*2*cols2;
+        }
+        tv = inI[i2] + inI[i2+1];
+        tv = tv + inI[i2+cols2] + inI[i2+cols2+1];
+        tv = tv / 4;
+
+        outI[i] = tv;
+
+        i2 += 2;
+    }
+}
+
+
+void cvtCopyI32F2RGBA(
+    std::vector<float> &inI, 
+    uint32_t irows, uint32_t icols,  
+    uint8_t *outRGBA, 
+    uint32_t ox0,
+    uint32_t oy0,
+    uint32_t orows, 
+    uint32_t ocols)
+{
+    uint32_t in_i, in_j, size = irows*icols;
+    uint32_t out_i, out_j;
+    uint8_t in_v;
+
+    for(in_i=0; in_i<size; in_i++){
+        if( (in_i%icols) == 0){
+            out_i = 4*((in_i/icols)*ocols+ox0);
+        }
+        in_v = (uint8_t) inI[in_i];
+        outRGBA[out_i] = in_v;
+        outRGBA[out_i+1] = in_v;
+        outRGBA[out_i+2] = in_v;
+        out_i+=4;
+    }
 }
