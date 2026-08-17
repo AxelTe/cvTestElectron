@@ -14,6 +14,7 @@ const myAddon = require(addonPath);
  */
 class imgseq extends EventEmitter {
     #imgD = undefined;
+    #imgD2 = undefined;
     #imgInfo = undefined;
 
     constructor() {
@@ -68,18 +69,18 @@ class imgseq extends EventEmitter {
                 console.log("Error during JSON.parse():", error);
                 return
             }
-            console.log("imgseq.start: ", this.seqinfo);
-            
+            //@@@ console.log("imgseq.start: ", this.seqinfo);
+
             try {
 
                 const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols);
                 console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
-                
+
             } catch (error) {
                 console.log("imgseq.loadImg()> Error: ", error);
             }
 
-            this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo});
+            this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo });
         });
     }
 
@@ -102,10 +103,6 @@ class imgseq extends EventEmitter {
         switch (this.seqinfo.suffix) {
             case "jpg":
                 sharp(fname)
-                    //.resize(cv_cols, cv_rows, {
-                    //    kernel: sharp.kernel.nearest,
-                    //    fit: 'fill',
-                    //})
                     .ensureAlpha() // Garantiert 4 Kanäle (Rot, Grün, Blau, Alpha)
                     .raw()
                     .toBuffer({ resolveWithObject: true })
@@ -129,10 +126,6 @@ class imgseq extends EventEmitter {
                         channels: 4, // BMP decoded as RGBA uses 4 channels
                     },
                 })
-                    .resize(cv_cols, cv_rows, {
-                        kernel: sharp.kernel.nearest,
-                        fit: 'fill',
-                    })
                     .ensureAlpha() // Garantiert 4 Kanäle (Rot, Grün, Blau, Alpha)
                     .raw()
                     .toBuffer({ resolveWithObject: true })
@@ -155,6 +148,9 @@ class imgseq extends EventEmitter {
     processImg() {
         console.log("imgseq.processImg> ");
         let t0 = Date.now();
+        if (this.#imgD2 === undefined) {
+            this.#imgD2 = this.#imgD.slice();
+        }
         try {
             const result = myAddon.process(
                 this.#imgD,
@@ -166,12 +162,22 @@ class imgseq extends EventEmitter {
             // send processing time to renderer
             this.emit("imgseqInfo", { processTime: Date.now() - t0 });
             // send image to renderer
-            this.emit("imgseqInfo", { 
-                img: this.#imgD, 
-                rows: this.#imgInfo.height, 
+            this.emit("imgseqInfo", {
+                disp: "pyramid",
+                img2: this.#imgD2,
+                rows: this.#imgInfo.height,
                 cols: this.#imgInfo.width,
                 channels: this.#imgInfo.channels,
-                id: this.id });
+                id: this.id
+            });
+            this.emit("imgseqInfo", {
+                disp: "main",
+                img: this.#imgD,
+                rows: this.#imgInfo.height,
+                cols: this.#imgInfo.width,
+                channels: this.#imgInfo.channels,
+                id: this.id
+            });
         } catch (error) {
             console.log("imgseq.processImg> Error: ", error);
         }

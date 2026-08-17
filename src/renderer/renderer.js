@@ -135,7 +135,12 @@ window.electronAPI.onInfo((msg) => {
     console.log("img");
     let el = document.getElementById("DispBar");
     el.value = imgDisp.id;
-    imgDisp.dispImg(msg.img, ptimes);
+    let img = msg.img;
+    let rows = msg.rows;
+    let cols = msg.cols;
+    let channels = msg.channels;
+          
+    imgDisp.dispImg(img, rows, cols, ptimes);
   }
 
 });

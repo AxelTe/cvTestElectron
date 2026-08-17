@@ -6,54 +6,16 @@ require('log-timestamp');
 
 let configFile = path.join(__dirname, '../main/config.json');
 console.log(configFile);
-let config = JSON.parse( fs.readFileSync(configFile));
+let config = JSON.parse(fs.readFileSync(configFile));
 let imgseq = require('../main/imgseq.js');
-
-const template = [
-  // ... andere Menüpunkte wie File, Edit, etc.
-  { role: 'fileMenu' },
-  { role: 'editMenu' },
-  { role: 'viewMenu' },
-  { role: 'windowMenu' },
-  {
-    role: 'help', // Sorgt auf macOS für die richtige Position
-    submenu: [
-      {
-        label: 'About',
-        click: async () => {
-          // Hier rufen wir die Versionsinfos ab
-          const versionInfo = `
-            App Version: ${app.getVersion()}
-            Electron: ${process.versions.electron}
-            Chrome: ${process.versions.chrome}
-            Node.js: ${process.versions.node}
-          `;
-
-          dialog.showMessageBox({
-            type: 'info',
-            title: 'version:',
-            detail: versionInfo,
-            buttons: ['OK']
-          });
-        }
-      },
-      { type: 'separator' },
-      {
-        label: 'Website besuchen',
-        click: async () => {
-          await shell.openExternal('https://deine-website.de');
-        }
-      }
-    ]
-  }
-];
-
+let mainWin = undefined;
+let imgPyramidWin = undefined;
 
 
 //
 // 
 const createWindow = () => {
-  const win = new BrowserWindow({
+  mainWin = new BrowserWindow({
     width: 800,
     height: 600,
     icon: path.join(__dirname, '../renderer/logo1.png'),
@@ -62,12 +24,45 @@ const createWindow = () => {
     }
   });
   //win.maximize();
-  win.loadFile('src/renderer/index.html')
+  mainWin.loadFile('src/renderer/index.html')
 
-  win.webContents.on('did-finish-load', () => {
-    console.log("browser window ready");
+  mainWin.webContents.on('did-finish-load', () => {
+    console.log("main browser window ready");
     imgseq.start(config.imgseq);
+  });
 
+  mainWin.on("close", () => {
+    console.log("main browser window closes");
+    if( imgPyramidWin !== undefined){
+      imgPyramidWin.close();
+      imgPyramidWin = undefined;
+    }
+  });
+}
+
+
+//
+// 
+const createPyramidWin = () => {
+  /* */
+  if (imgPyramidWin !== undefined) {
+    imgPyramidWin.focus();
+    return;
+  }
+  imgPyramidWin = new BrowserWindow({
+    width: 800,
+    height: 600,
+    icon: path.join(__dirname, '../renderer/logo1.png'),
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js')
+    }
+  });
+  //win.maximize();
+  imgPyramidWin.loadFile('src/renderer/indexPyramidWin.html');
+
+  imgPyramidWin.on("close", () => {
+    console.log("imgPyramidWin browser window closes");
+    imgPyramidWin = undefined;
   });
 
 }
@@ -81,8 +76,10 @@ app.whenReady().then(() => {
   console.log(__dirname);
 
   // Menü registrieren
+  /*
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+  */
 
   ipcMain.handle('ping', () => {
     console.log("on: ping");
@@ -92,17 +89,11 @@ app.whenReady().then(() => {
     })
   })
 
-  createWindow()
-
-
-  app.on('activate', () => {
-    console.log("on: activate");
-    //  if (BrowserWindow.getAllWindows().length === 0) {
-    //    createWindow()
-    //  }
-  })
+  createWindow();
+  createPyramidWin();
 
 })
+
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
@@ -134,7 +125,7 @@ ipcMain.handle('dialog:openFile', async () => {
       try {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
       } catch (error) {
-        sendErrorToUI("can not write "+configFile);
+        sendErrorToUI("can not write " + configFile);
       }
     }
     return filePaths; // Gibt die Pfade an das Frontend zurück
@@ -151,11 +142,9 @@ ipcMain.handle('dialog:openFile', async () => {
  * 
  * @param {string} meldung 
  */
-function sendErrorToUI(meldung) {
-  // Wir schicken es an das aktive Fenster
-  const win = BrowserWindow.getFocusedWindow();
-  if (win) {
-    win.webContents.send('globaler-fehler', meldung);
+function sendErrorToUI(msg) {
+  if (mainWin !== undefined) {
+    mainWin.webContents.send('globaler-fehler', msg);
   }
 }
 
@@ -163,11 +152,18 @@ function sendErrorToUI(meldung) {
  * 
  * @param {string} meldung 
  */
-function sendInfoToUI(meldung) {
+function sendInfoToMainGUI(msg) {
   // Wir schicken es an das aktive Fenster
-  const win = BrowserWindow.getFocusedWindow();
-  if (win) {
-    win.webContents.send('info', meldung);
+  if (mainWin !== undefined) {
+    mainWin.webContents.send('info', msg);
+  }
+}
+
+function sendInfoToPyramidImg(msg) {
+  // Wir schicken es an das aktive Fenster
+  console.log("sendInfoToPyramidImg")
+  if (imgPyramidWin !== undefined) {
+    imgPyramidWin.webContents.send('pyramidInfo', msg);
   }
 }
 
@@ -179,28 +175,31 @@ ipcMain.on('loadFromRoot', (event, data) => {
 
 
 //
-  // 
-  // listeners on imgseq events
-  //---------------------------
-  //
+// 
+// listeners on imgseq events
+//---------------------------
+//
 
-  imgseq.on("imgseqInfo", function (msg) {
-    if (msg.hasOwnProperty("loadTime")) {
-      imgseq.processImg();
-      sendInfoToUI(msg);
-    }
-    if (msg.hasOwnProperty("processTime")) {
-      sendInfoToUI(msg);
-    }
-    if (msg.hasOwnProperty("img")) {
-      sendInfoToUI(msg);
-    }
-    if (msg.hasOwnProperty("seqname")) {
-      sendInfoToUI(msg);
-    }
+imgseq.on("imgseqInfo", function (msg) {
+  //@@@ console.log("imgseq.on()>", msg)
+  if (msg.hasOwnProperty("loadTime")) {
+    imgseq.processImg();
+    sendInfoToMainGUI(msg);
+  }
+  if (msg.hasOwnProperty("processTime")) {
+    sendInfoToMainGUI(msg);
+  }
+  if (msg.hasOwnProperty("disp")) {
+    if(msg.disp === "main") sendInfoToMainGUI(msg);
+    if(msg.disp === "pyramid") sendInfoToPyramidImg(msg);
+  }
+  if (msg.hasOwnProperty("seqname")) {
+    sendInfoToMainGUI(msg);
+    sendInfoToPyramidImg(msg);
+  }
 
-  });
+});
 
-  imgseq.on("imgseqError", function (msg) {
-    sendErrorToUI(`Kritischer Systemfehler: ${msg}`);
-  });
+imgseq.on("imgseqError", function (msg) {
+  sendErrorToUI(`Kritischer Systemfehler: ${msg}`);
+});

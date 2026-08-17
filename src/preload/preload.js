@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('dialog:openFile'),
   onFehler: (callback) => ipcRenderer.on('globaler-fehler', (event, msg) => callback(msg)),
   onInfo: (callback) => ipcRenderer.on('info', (event, msg) => callback(msg)),
-  loadFromRoot: (msg) => ipcRenderer.send('loadFromRoot', msg)
+  onPyramidInfo: (callback) => ipcRenderer.on('pyramidInfo', (event, msg) => callback(msg)),
+  loadFromRoot: (msg) => ipcRenderer.send('loadFromRoot', msg),
 });
+
 

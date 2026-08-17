@@ -40,10 +40,10 @@ class imgdisp {
      * 
      * @param {Uint8Array} img 
      */
-    dispImg( imgU8Array , pTimes){
+    dispImg( imgU8Array , rows, cols, pTimes){
         const ctx = this.cv.getContext('2d');
         const clampedArray = new Uint8ClampedArray(imgU8Array); //.data);
-        const imageData = new ImageData(clampedArray, this.cols, this.rows);
+        const imageData = new ImageData(clampedArray, cols, rows);
         ctx.putImageData(imageData, 0, 0);
         //
         let tstr = "Proc. time: ";
