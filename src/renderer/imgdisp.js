@@ -11,19 +11,11 @@ class imgdisp {
      * @param {number} wc maximal width for canvas 
      * @param {number} hc maximal height for canvas 
      */
-    constructor(cv, wc, hc){
+    constructor(cv){ 
         // canvas object
         this.cv = cv;
-        this.wc = wc;
-        this.hc = hc;
-        this.wd = this.cv.width;
-        this.hd = this.cv.height;
-        this.xd0 = (this.wc-this.wd)/2;
-        this.yd0 = (this.hc-this.hd)/2;
-        this.cv.style.top = this.yd0+"px";
-        this.cv.style.left = this.xd0+"px";
-        this.rows = this.hd;
-        this.cols = this.wd;
+        this.rows = 0; 
+        this.cols = 0; 
         this.start = 0;
         this.end = 0;
         this.id = 0;
@@ -50,7 +42,7 @@ class imgdisp {
         tstr = tstr + pTimes[0].min + ".."+pTimes[0].val+".."+pTimes[0].max;
         tstr = tstr + ", "+pTimes[1].min + ".."+pTimes[1].val+".."+pTimes[1].max;
         tstr = tstr + ", "+(Date.now() - this.#t0);
-        ctx.fillText(tstr, 2, this.hd -2 );
+        ctx.fillText(tstr, 2, this.rows -2 );
         //
         if( (this.end-this.start)<=this.id){
             clearInterval(this.dispQueueTimer);
@@ -97,8 +89,14 @@ class imgdisp {
         // reset img id
         this.id = 0;
 
-        this.setCVSize(this.cols, this.rows);
+        this.setCVSize2(this.cols, this.rows);
     }
+
+    setCVSize2(iw,ih){
+        this.cv.width = this.cols;
+        this.cv.height = this.rows;
+    }
+
 
     setCVSize(iw,ih){
         if(this.wc >= iw && this.hc >= ih){

@@ -10,8 +10,7 @@ const color4 = styles.getPropertyValue('--color4').trim();
 
 const infoId = document.getElementById('info')
 let cv = document.getElementById('incv');
-let tid = document.getElementById('mainFrame')
-let imgDisp = new imgdisp(cv, tid.clientWidth, tid.clientHeight);
+let imgDisp = new imgdisp(cv); 
 let ptimes = new Array(5);
 for(let i=0; i<ptimes.length; i++){
   ptimes[i] = {min: 1000, max:0, val: 0};

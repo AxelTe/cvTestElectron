@@ -50,8 +50,8 @@ const createPyramidWin = () => {
     return;
   }
   imgPyramidWin = new BrowserWindow({
-    width: 800,
-    height: 600,
+    //width: 800,
+    //height: 600,
     icon: path.join(__dirname, '../renderer/logo1.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js')
@@ -183,11 +183,13 @@ ipcMain.on('loadFromRoot', (event, data) => {
 imgseq.on("imgseqInfo", function (msg) {
   //@@@ console.log("imgseq.on()>", msg)
   if (msg.hasOwnProperty("loadTime")) {
-    imgseq.processImg();
     sendInfoToMainGUI(msg);
+    imgseq.processImg();
   }
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
+    imgseq.showImg(2);
+    imgseq.showImg(12);
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
@@ -196,6 +198,11 @@ imgseq.on("imgseqInfo", function (msg) {
   if (msg.hasOwnProperty("seqname")) {
     sendInfoToMainGUI(msg);
     sendInfoToPyramidImg(msg);
+    if(msg.hasOwnProperty("seqinfo")){
+      console.log("imgseq.on()>", msg)
+      mainWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
+      if( imgPyramidWin != undefined) imgPyramidWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
+    }
   }
 
 });

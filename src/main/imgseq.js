@@ -158,28 +158,68 @@ class imgseq extends EventEmitter {
                 this.#imgInfo.width,
                 this.#imgInfo.channels
             );
-            console.log("imgseq.processImg> myAddon.process() retruned:", result);
+            console.log("imgseq.processImg> myAddon.process() returned:", result);
             // send processing time to renderer
             this.emit("imgseqInfo", { processTime: Date.now() - t0 });
-            // send image to renderer
-            this.emit("imgseqInfo", {
-                disp: "pyramid",
-                img2: this.#imgD2,
-                rows: this.#imgInfo.height,
-                cols: this.#imgInfo.width,
-                channels: this.#imgInfo.channels,
-                id: this.id
-            });
-            this.emit("imgseqInfo", {
-                disp: "main",
-                img: this.#imgD,
-                rows: this.#imgInfo.height,
-                cols: this.#imgInfo.width,
-                channels: this.#imgInfo.channels,
-                id: this.id
-            });
         } catch (error) {
             console.log("imgseq.processImg> Error: ", error);
+        }
+    }
+
+    /**
+    * 
+    */
+    showImg(mode) {
+        console.log("imgseq.showImg> ");
+        let t0 = Date.now();
+        if (mode >= 10) {
+            try {
+                const result = myAddon.show(
+                    this.#imgD2,
+                    this.#imgInfo.height,
+                    this.#imgInfo.width,
+                    this.#imgInfo.channels,
+                    mode
+                );
+                console.log("imgseq.showImg> myAddon.process() returned:", result);
+                // send processing time to renderer
+                // send image to renderer
+                this.emit("imgseqInfo", {
+                    disp: "pyramid",
+                    img: this.#imgD2,
+                    rows: this.#imgInfo.height,
+                    cols: this.#imgInfo.width,
+                    channels: this.#imgInfo.channels,
+                    id: this.id
+                });
+                
+            } catch (error) {
+                console.log("imgseq.showImg> Error: ", error);
+            }
+        }
+        else {
+            try {
+                const result = myAddon.show(
+                    this.#imgD,
+                    this.#imgInfo.height,
+                    this.#imgInfo.width,
+                    this.#imgInfo.channels,
+                    mode
+                );
+                console.log("imgseq.showImg> myAddon.process() returned:", result);
+                // send processing time to renderer
+                // send image to renderer
+                this.emit("imgseqInfo", {
+                    disp: "main",
+                    img: this.#imgD,
+                    rows: this.#imgInfo.height,
+                    cols: this.#imgInfo.width,
+                    channels: this.#imgInfo.channels,
+                    id: this.id
+                });
+            } catch (error) {
+                console.log("imgseq.showImg> Error: ", error);
+            }
         }
     }
 
