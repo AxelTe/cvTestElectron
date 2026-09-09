@@ -3,7 +3,7 @@ const path = require('node:path');
 const bmp = require('@vingle/bmp-js');
 const sharp = require('sharp');
 const EventEmitter = require('node:events');
-const { toUnicode } = require('node:punycode');
+//const { toUnicode } = require('node:punycode');
 
 //const addonPath = path.join(__dirname, '../../build/Release/my_addon.node');
 const addonPath = path.join(__dirname, '../../build/Debug/my_addon.node');
@@ -166,6 +166,17 @@ class imgseq extends EventEmitter {
         }
     }
 
+    saveImg() {
+        const bmpData = bmp.encode({
+            data: buffer,
+            width: width,
+            height: height
+        });
+
+        // Write the binary data to a file
+        fs.writeFileSync('output.bmp', bmpData.data);
+        console.log('BMP image saved successfully!');
+    }
     /**
     * 
     */
@@ -192,7 +203,7 @@ class imgseq extends EventEmitter {
                     channels: this.#imgInfo.channels,
                     id: this.id
                 });
-                
+
             } catch (error) {
                 console.log("imgseq.showImg> Error: ", error);
             }

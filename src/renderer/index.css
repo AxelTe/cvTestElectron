@@ -8,7 +8,8 @@
     --textcolor3: lightgrey;
 }
 
-html, body {
+html,
+body {
     margin: 0;
     height: 100%;
     min-height: 100%;
@@ -16,9 +17,9 @@ html, body {
 }
 
 div {
-  border: 0px;
-  font-family: Helvetica;
-  font-weight: normal;
+    border: 0px;
+    font-family: Helvetica;
+    font-weight: normal;
 }
 
 header,
@@ -32,9 +33,10 @@ button {
 }
 
 button:hover {
-  background-color: var(--color3) !important;
-  color: white !important;
-  cursor: pointer; /* Changes the arrow to a hand */
+    background-color: var(--color3) !important;
+    color: white !important;
+    cursor: pointer;
+    /* Changes the arrow to a hand */
 }
 
 canvas {
@@ -176,6 +178,18 @@ video {
     font-size: 1.0em;
 
 }
- #footRight {
+
+#footRight {
     font-size: 0.5em;
- }
+}
+
+#magnifier {
+    position: absolute;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    /* Verhindert Flimmern beim Bewegen der Maus */
+    display: none;
+    z-index: 10;
+}

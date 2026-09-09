@@ -210,8 +210,13 @@ Napi::Value show(const Napi::CallbackInfo &info)
         break;
 
     // original level
+    case 3:
+        // edges on mag level
+        cvtMag2RGBA(imgLevels[0].gradI_float, pixels, size);
+        cvtEdgPts2RGBA(imgLevels[0].edgL_float, pixels, rows, cols, 0, 0);
+        break;
     case 2:
-        // edges
+        // edges on grey level
         cvtGrey2RGBA(imgLevels[0].greyI_float, pixels, size);
         cvtEdgPts2RGBA(imgLevels[0].edgL_float, pixels, rows, cols, 0, 0);
         break;

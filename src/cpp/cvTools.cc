@@ -135,6 +135,8 @@ void cvtEdgPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t ro
             p = yi * (channels*cols);
             p = p + (channels*xi);
             outRGBA[p] = 255;
+            outRGBA[p+1] = 0;
+            outRGBA[p+2] = 0;
         }
     }
     
@@ -268,10 +270,12 @@ void cvtInitGMask32F(float sigma, std::vector<float> &gmask32F, uint32_t size)
 void cvtMag2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size)
 {
     float g;
+    uint8_t gi;
     uint32_t channels = 4;
     for (uint32_t i = 0, j = 0; i < size; i++)
     {
-        g = gradI32F[i].mag;
+        g = 2*gradI32F[i].mag;
+        gi = (uint8_t) (g>255.0 ? 255 : g); 
         outRGBA[j] = (uint8_t)g;
         outRGBA[j + 1] = (uint8_t)g;
         outRGBA[j + 2] = (uint8_t)g;

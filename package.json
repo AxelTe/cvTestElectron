@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@vingle/bmp-js": "^0.2.5",
+    "bmp-js": "^0.1.0",
     "log-timestamp": "^0.3.0",
     "node-addon-api": "^8.9.1",
     "sharp": "^0.34.5"

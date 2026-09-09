@@ -11,10 +11,13 @@ const color4 = styles.getPropertyValue('--color4').trim();
 const infoId = document.getElementById('info')
 let cv = document.getElementById('incv');
 let imgDisp = new imgdisp(cv); 
+
 let ptimes = new Array(5);
 for(let i=0; i<ptimes.length; i++){
   ptimes[i] = {min: 1000, max:0, val: 0};
 }
+
+let magTool = new mouseOnCanvas(document.getElementById('mainFrame'), cv, document.getElementById('magnifier'));
 
 //
 // button function
@@ -157,3 +160,4 @@ cv.addEventListener('loadFromRoot', (e) => {
   // console.log('loadFromRoot'+" "+e.detail.msg);
   window.electronAPI.loadFromRoot(e.detail.msg);
 });
+
