@@ -9,6 +9,9 @@ class mouseOnCanvas {
     #zoomLevel = 2.5;
     #magSize = 150;
     #sourceSize = this.#magSize / this.#zoomLevel;
+    #magnifierBtn = undefined;
+    #handleMouseMove = null;
+    #backBtn = undefined;
 
 
     constructor(container, cvin, cvout) {
@@ -22,12 +25,61 @@ class mouseOnCanvas {
             this.#cvout.style.display = 'none';
         });
 
-        this.#container.addEventListener('mousemove', (event) => this.onMouseMove(this, event));
+       
 
+        this.#container.addEventListener('contextmenu', (event) => this.onContextMenu(this, event));
         
     }
-
     
+    /**
+     * 
+     * @param {*} self 
+     * @param {*} e 
+     */
+    onContextMenu(self, e) {
+        // Mausposition relativ zum Canvas berechnen
+        const rect = self.#container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        console.log("onContextMenu", mouseX, mouseY);
+        let el = document.getElementById("mouseCtx");
+        el.style.display = "flex";
+        el.style.top = mouseY+"px";
+        el.style.left = mouseX+"px";
+        //
+        this.#container.removeEventListener('mousemove', this.#handleMouseMove);
+        this.#handleMouseMove = null;
+        self.#magnifierBtn = el.appendChild( document.createElement('button') );
+        self.#magnifierBtn.innerText = "magnify";
+        self.#magnifierBtn.addEventListener("click", (event) => self.onMagnifierBtn(self,event));
+        //
+        self.#backBtn = el.appendChild( document.createElement('button') );
+        self.#backBtn.innerText = "back";
+        self.#backBtn.addEventListener("click", (event) => self.offContextMenu(self, event));
+        
+    }
+    
+    onMagnifierBtn(self,event){
+        console.log("onMagnifierBtn");
+        self.#handleMouseMove = (event) => this.onMouseMove(this, event);
+        this.#container.addEventListener('mousemove', self.#handleMouseMove);
+        this.offContextMenu(self,event);
+    }
+
+    offContextMenu(self, e){
+        console.log("offContextMenu");
+        self.#magnifierBtn = null;
+        self.#backBtn = null;
+        let el = document.getElementById("mouseCtx");
+        el.replaceChildren();
+        el.style.display = "none";
+    }
+
+    /**
+     * 
+     * @param {*} self 
+     * @param {*} e 
+     */
     onMouseMove(self, e) {
         const rect = self.#container.getBoundingClientRect();
 

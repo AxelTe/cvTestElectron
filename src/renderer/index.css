@@ -58,6 +58,15 @@ video {
  * classes
  */
 
+ .popup {
+    display: none;
+    z-index: 100;
+    position: absolute;
+    background-color: var(--color4);
+    border: 1px solid var(--color1);
+    flex-direction: column;
+ }
+
 .tableCol {
     border: 0px;
     display: flex;

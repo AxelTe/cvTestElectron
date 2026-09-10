@@ -27,7 +27,23 @@ class imgseq extends EventEmitter {
         this.#imgInfo = undefined;
         this.rows = 0;
         this.cols = 0;
+        this.nofLevels = 0;
+        this.gradThLow = 2;
+        this.gradThHigh = 10;
         this.id = -1;
+    }
+
+    getHistEdges(){
+        console.log("imgseq.getHistEdges>");
+        try {
+            const result = myAddon.getHistEdges();
+            console.log("imgseq.getHistEdges> myAddon.getHistEdges() returned:", result.length);
+            // send processing time to renderer
+            this.emit("imgseqInfo", { histEdges: result });
+        } catch (error) {
+            console.log("imgseq.getHistEdges> Error: ", error);
+            return
+        }
     }
 
     /**
@@ -39,7 +55,7 @@ class imgseq extends EventEmitter {
      * @param {number} config.imgArrLen "size of internal image array"
      * @returns {void}
      */
-    start(config) {
+    start(config, nofLevels) {
         let valid = true;
         if (config.hasOwnProperty("path")) this.path = config.path;
         else valid = false;
@@ -51,6 +67,7 @@ class imgseq extends EventEmitter {
             this.emit("imgseqError", "no correct sequence definition in config data");
             return;
         }
+        this.nofLevels = nofLevels;
 
         let fname = this.path + "\\" + this.seqname;
         console.log("imgseq.start:", fname);
@@ -72,8 +89,8 @@ class imgseq extends EventEmitter {
             //@@@ console.log("imgseq.start: ", this.seqinfo);
 
             try {
-
-                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols);
+                console.log("myAddon.initialize", this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh)
+                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh);
                 console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
 
             } catch (error) {
@@ -148,7 +165,7 @@ class imgseq extends EventEmitter {
     processImg() {
         console.log("imgseq.processImg> ");
         let t0 = Date.now();
-        if (this.#imgD2 === undefined) {
+        if (this.nofLevels > 1 && this.#imgD2 === undefined) {
             this.#imgD2 = this.#imgD.slice();
         }
         try {
@@ -166,6 +183,9 @@ class imgseq extends EventEmitter {
         }
     }
 
+    /**
+     * 
+     */
     saveImg() {
         const bmpData = bmp.encode({
             data: buffer,
@@ -181,9 +201,9 @@ class imgseq extends EventEmitter {
     * 
     */
     showImg(mode) {
-        console.log("imgseq.showImg> ");
+        console.log("imgseq.showImg>", mode);
         let t0 = Date.now();
-        if (mode >= 10) {
+        if (mode >= 10 && this.#imgD2 !== undefined) {
             try {
                 const result = myAddon.show(
                     this.#imgD2,

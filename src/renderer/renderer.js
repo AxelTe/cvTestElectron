@@ -145,6 +145,10 @@ window.electronAPI.onInfo((msg) => {
     imgDisp.dispImg(img, rows, cols, ptimes);
   }
 
+  if (msg.hasOwnProperty("histEdges")) {
+    console.log("histEdges", msg.histEdges.slice(0,30));
+  }
+
 });
 
 /**

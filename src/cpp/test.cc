@@ -13,6 +13,8 @@ static uint32_t rows;
 static uint32_t cols;
 static uint32_t size;
 static uint32_t nofLevels;
+static float gradThLow;
+static float gradThHigh;
 
 std::vector<imgLevel> imgLevels;
 
@@ -24,20 +26,23 @@ Napi::Value initialize(const Napi::CallbackInfo &info)
     Napi::Env env = info.Env();
 
     // check input 'info' structure
-    if (info.Length() != 2)
+    if (info.Length() != 5)
     {
-        Napi::TypeError::New(env, "expected: (width, height)")
+        Napi::TypeError::New(env, "expected: (width, height, nofLevels, gradThLow, gradThHigh)")
             .ThrowAsJavaScriptException();
         return env.Null();
     }
     rows = info[0].As<Napi::Number>().Uint32Value();
     cols = info[1].As<Napi::Number>().Uint32Value();
+    nofLevels = info[2].As<Napi::Number>().Uint32Value();
+    gradThLow = info[3].As<Napi::Number>().FloatValue();
+    gradThHigh = info[4].As<Napi::Number>().FloatValue();
     size = rows * cols;
 
     // Allocate memory on the C++ heap
     gmask32F.resize(GMASKSIZE, 0);
     cvtInitGMask32F(2.0, gmask32F, GMASKSIZE);
-    nofLevels = 3;
+    //nofLevels = 3;
     imgLevels.resize(nofLevels);
     cvtInitImgLevels(imgLevels, rows, cols, nofLevels);
 
@@ -51,7 +56,6 @@ Napi::Value process(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
     float magMax;
-    float gradTh = 5.0;
     uint32_t nofEdges, i, icols, irows;
 
     // check input 'info' structure
@@ -89,8 +93,9 @@ Napi::Value process(const Napi::CallbackInfo &info)
     /**/
     cvtRGBA2Grey(pixels, imgLevels[0].greyI_float, size);
     cvtGauss5x5(imgLevels[0].greyI_float, imgLevels[0].tmpI_float, imgLevels[0].gaussI_float, gmask32F, rows, cols);
-    magMax = cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, gradTh, rows, cols);
-    nofEdges = cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgL_float, gradTh, rows, cols);
+    magMax = cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, gradThLow, rows, cols);
+    nofEdges = cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgL_float, gradThLow, rows, cols);
+    cvtEdgHistogram(imgLevels[0].edgL_float, imgLevels[0].histEdges);
     //
     icols = cols;
     irows = rows;
@@ -100,26 +105,30 @@ Napi::Value process(const Napi::CallbackInfo &info)
         irows >>= 1;
         cvtSubSample(imgLevels[i - 1].gaussI_float, imgLevels[i].greyI_float, irows, icols);
         cvtGauss5x5(imgLevels[i].greyI_float, imgLevels[i].tmpI_float, imgLevels[i].gaussI_float, gmask32F, irows, icols);
-        magMax = cvtGrad(imgLevels[i].gaussI_float, imgLevels[i].gradI_float, gradTh, irows, icols);
-        nofEdges = cvtEdgDetection(imgLevels[i].gradI_float, imgLevels[i].edgL_float, gradTh, irows, icols);
+        magMax = cvtGrad(imgLevels[i].gaussI_float, imgLevels[i].gradI_float, gradThLow, irows, icols);
+        nofEdges = cvtEdgDetection(imgLevels[i].gradI_float, imgLevels[i].edgL_float, gradThLow, irows, icols);
     }
 
-#if 0
-    //
-    // convert image back for display
-    // cvtGrey2RGBA(gfilI32F, pixels, size);
-    // cvtMag2RGBA(gradI, pixels, size);
-    cvtEdg2RGBA(imgLevels[0].gradI_float, pixels, size);
-    icols = cols;
-    irows = rows;
-    for (i = 1; i < nofLevels; i++)
-    {
-        icols >>= 1;
-        irows >>= 1;
-        cvtCopyI32F2RGBA(imgLevels[i].greyI_float, irows, icols, pixels, 0, 0, rows, cols);
-    }
-#endif
     return Napi::String::New(env, "process done");
+}
+
+
+/**
+ *  Returning a std::vector<uint_32> as a JavaScript Array
+ */
+Napi::Array getHistEdges(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    uint32_t histSize = imgLevels[0].histEdges.size();
+
+    
+    // Create a new JS Array with pre-allocated length
+    Napi::Array jsArray = Napi::Array::New(env, histSize);
+
+    for (size_t i = 0; i < histSize; ++i) {
+        jsArray.Set(i, Napi::Number::New(env, imgLevels[0].histEdges[i]));
+    }
+
+    return jsArray;
 }
 
 /**
@@ -237,6 +246,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     exports.Set(Napi::String::New(env, "initialize"), Napi::Function::New(env, initialize));
     exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, process));
+    exports.Set("getHistEdges", Napi::Function::New(env, getHistEdges));
     exports.Set(Napi::String::New(env, "show"), Napi::Function::New(env, show));
     return exports;
 }

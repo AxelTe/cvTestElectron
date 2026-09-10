@@ -4,5 +4,7 @@
     "seqname": "testMuster2026-03-30.json",
     "last": 1
   },
-  "imagePyramidFlag": true
+  "imagePyramids": 1,
+  "gradThLow": 3,
+  "gradThHigh": 10
 }

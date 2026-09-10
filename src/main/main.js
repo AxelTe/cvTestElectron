@@ -28,7 +28,7 @@ const createWindow = () => {
 
   mainWin.webContents.on('did-finish-load', () => {
     console.log("main browser window ready");
-    imgseq.start(config.imgseq);
+    imgseq.start(config.imgseq, config.imagePyramids);
   });
 
   mainWin.on("close", () => {
@@ -90,7 +90,7 @@ app.whenReady().then(() => {
   })
 
   createWindow();
-  createPyramidWin();
+  if(config.imagePyramids > 1) createPyramidWin();
 
 })
 
@@ -121,7 +121,7 @@ ipcMain.handle('dialog:openFile', async () => {
       }
       config.imgseq.path = tstr;
       config.imgseq.seqname = tstr1[tstr1.length - 1];
-      imgseq.start(config.imgseq);
+      imgseq.start(config.imgseq, config.imagePyramids);
       try {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
       } catch (error) {
@@ -189,7 +189,8 @@ imgseq.on("imgseqInfo", function (msg) {
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
     imgseq.showImg(2);
-    imgseq.showImg(12);
+    if(config.imagePyramids>1) imgseq.showImg(12);
+    imgseq.getHistEdges();
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
@@ -204,7 +205,10 @@ imgseq.on("imgseqInfo", function (msg) {
       if( imgPyramidWin != undefined) imgPyramidWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
     }
   }
-
+  if (msg.hasOwnProperty("histEdges")) {
+    sendInfoToMainGUI(msg);
+  }
+  
 });
 
 imgseq.on("imgseqError", function (msg) {

@@ -72,7 +72,7 @@ uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> 
 
             if (gradI[c].mag >= mF1 && gradI[c].mag >= mF2)
             {
-                gradI[c].edg = 1.;
+                gradI[c].edg = 1;
                 cnt++;
             }
         }
@@ -93,12 +93,31 @@ uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> 
                 edges[cnt].mag = gradI[c].mag;
                 edges[cnt].dir = gradI[c].dir;
                 cnt++;
+                gradI[c].edg = cnt;
             }
         }
     }
 
     return (cnt);
 }
+
+void cvtEdgHistogram(
+    std::vector<edg_float> &edges, 
+    std::vector<uint32_t> &hist
+){
+    uint32_t nofEdges = edges.size();
+    float val;
+
+    for (uint32_t i = 0; i < 256; i++) hist[i] = 0;
+    
+    for (uint32_t i = 0; i < nofEdges; i++)
+    {
+        val = edges[i].mag;
+        val = val>255. ? 255. : val;
+        hist[(uint8_t) val]++;
+    }
+}
+
 
 /**
  *
@@ -119,28 +138,79 @@ void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t s
 }
 
 /**
- * 
+ *
  */
 void cvtEdgPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
 {
+    float dir, h, f;
+    int sector;
+    uint8_t q,t,r,g,b; 
     uint32_t channels = 4;
     uint32_t nofEdgs = edges.size();
     uint32_t xi, yi, p;
-    for (uint32_t i = 0; i < nofEdgs; i++){
-        xi = (uint32_t) edges[i].x; 
-        yi = (uint32_t) edges[i].y; 
+    for (uint32_t i = 0; i < nofEdgs; i++)
+    {
+        xi = (uint32_t)edges[i].x;
+        yi = (uint32_t)edges[i].y;
         xi = xi + xoff;
         yi = yi + yoff;
-        if(xi>=0 && xi < cols && yi>= 0 && yi < rows){
-            p = yi * (channels*cols);
-            p = p + (channels*xi);
-            outRGBA[p] = 255;
-            outRGBA[p+1] = 0;
-            outRGBA[p+2] = 0;
+        if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
+        {
+            // Normalize angle to [0.0, 360.0) range
+            dir = fmodf(edges[i].dir, 360.0f);
+            if (dir < 0.0f)
+            {
+                dir += 360.0f;
+            }
+
+            // Scale angle to 0.0 - 6.0 range (representing 6 color segments)
+            h = dir / 60.0f;
+            sector = (int)h;
+            f = h - (float)sector; // Fractional part
+
+            q = (uint8_t)((1.0f - f) * 255.0f);
+            t = (uint8_t)(f * 255.0f);
+
+            switch (sector)
+            {
+            case 0: // Red to Yellow (0° - 60°)
+                r = 255;
+                g = t;
+                b = 0;
+                break;
+            case 1: // Yellow to Green (60° - 120°)
+                r = q;
+                g = 255;
+                b = 0;
+                break;
+            case 2: // Green to Cyan (120° - 180°)
+                r = 0;
+                g = 255;
+                b = t;
+                break;
+            case 3: // Cyan to Blue (180° - 240°)
+                r = 0;
+                g = q;
+                b = 255;
+                break;
+            case 4: // Blue to Magenta (240° - 300°)
+                r = t;
+                g = 0;
+                b = 255;
+                break;
+            default: // Magenta to Red (300° - 360°)
+                r = 255;
+                g = 0;
+                b = q;
+                break;
+            }
+            p = yi * (channels * cols);
+            p = p + (channels * xi);
+            outRGBA[p] = r;
+            outRGBA[p + 1] = g;
+            outRGBA[p + 2] = b;
         }
     }
-    
-
 }
 
 /**
@@ -220,7 +290,7 @@ float cvtGrad(
     float mmax = 0;
     uint32_t c0, c1, c, size = rows * cols;
 
-    std::fill(gradI32F.begin(), gradI32F.end(), grad_float{0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+    std::fill(gradI32F.begin(), gradI32F.end(), grad_float{0.0f, 0.0f, 0.0f, 0.0f, 0});
     // work
     c0 = cols + 1;
     c1 = size - cols - 2;
@@ -233,7 +303,7 @@ float cvtGrad(
         {
             dv = 180. * atan2f(dy, dx) / pi;
             dv += 180;
-            gradI32F[c] = {dx, dy, mv, dv, 0.};
+            gradI32F[c] = {dx, dy, mv, dv, 0};
             mmax = (mmax < mv) ? mv : mmax;
         }
     }
@@ -274,8 +344,8 @@ void cvtMag2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t s
     uint32_t channels = 4;
     for (uint32_t i = 0, j = 0; i < size; i++)
     {
-        g = 2*gradI32F[i].mag;
-        gi = (uint8_t) (g>255.0 ? 255 : g); 
+        g = 2 * gradI32F[i].mag;
+        gi = (uint8_t)(g > 255.0 ? 255 : g);
         outRGBA[j] = (uint8_t)g;
         outRGBA[j + 1] = (uint8_t)g;
         outRGBA[j + 2] = (uint8_t)g;
@@ -322,37 +392,43 @@ void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t co
 {
     uint32_t i, size = rows * cols * 2;
     //
-    for(i=0; i<nofLevels; i++){
-        size = rows * (cols>>i);
+    for (i = 0; i < nofLevels; i++)
+    {
+        size = rows * (cols >> i);
         iLevelL[i].tmpI_float.resize(size, 0);
         iLevelL[i].greyI_float.resize(size, 0);
         iLevelL[i].gaussI_float.resize(size, 0);
         iLevelL[i].gradI_float.resize(size);
         iLevelL[i].edgL_float.resize(size);
+        iLevelL[i].histEdges.resize(256);
     }
-
 }
 
 /**
- * 
+ *
  */
-void cvtSubSample(std::vector<float> &inI, std::vector<float> &outI, uint32_t rows, uint32_t cols){
-    uint32_t i, size = rows*cols;
-    uint32_t i2,rows2, cols2, size2;
+void cvtSubSample(std::vector<float> &inI, std::vector<float> &outI, uint32_t rows, uint32_t cols)
+{
+    uint32_t i, size = rows * cols;
+    uint32_t i2, rows2, cols2, size2;
     float tv;
 
-    if(size > outI.size()) return;
-    cols2 = cols*2;
-    rows2 = rows*2;
-    size2 = rows2*cols2;
-    if(size2 > inI.size()) return;
+    if (size > outI.size())
+        return;
+    cols2 = cols * 2;
+    rows2 = rows * 2;
+    size2 = rows2 * cols2;
+    if (size2 > inI.size())
+        return;
 
-    for(i=0;i<size;i++){
-        if( (i%cols) == 0){
-            i2 = (i/cols)*2*cols2;
+    for (i = 0; i < size; i++)
+    {
+        if ((i % cols) == 0)
+        {
+            i2 = (i / cols) * 2 * cols2;
         }
-        tv = inI[i2] + inI[i2+1];
-        tv = tv + inI[i2+cols2] + inI[i2+cols2+1];
+        tv = inI[i2] + inI[i2 + 1];
+        tv = tv + inI[i2 + cols2] + inI[i2 + cols2 + 1];
         tv = tv / 4;
 
         outI[i] = tv;
@@ -361,28 +437,47 @@ void cvtSubSample(std::vector<float> &inI, std::vector<float> &outI, uint32_t ro
     }
 }
 
-
 void cvtCopyI32F2RGBA(
-    std::vector<float> &inI, 
-    uint32_t irows, uint32_t icols,  
-    uint8_t *outRGBA, 
+    std::vector<float> &inI,
+    uint32_t irows, uint32_t icols,
+    uint8_t *outRGBA,
     uint32_t ox0,
     uint32_t oy0,
-    uint32_t orows, 
+    uint32_t orows,
     uint32_t ocols)
 {
-    uint32_t in_i, in_j, size = irows*icols;
+    uint32_t in_i, in_j, size = irows * icols;
     uint32_t out_i, out_j;
     uint8_t in_v;
 
-    for(in_i=0; in_i<size; in_i++){
-        if( (in_i%icols) == 0){
-            out_i = 4*((in_i/icols)*ocols+ox0);
+    for (in_i = 0; in_i < size; in_i++)
+    {
+        if ((in_i % icols) == 0)
+        {
+            out_i = 4 * ((in_i / icols) * ocols + ox0);
         }
-        in_v = (uint8_t) inI[in_i];
+        in_v = (uint8_t)inI[in_i];
         outRGBA[out_i] = in_v;
-        outRGBA[out_i+1] = in_v;
-        outRGBA[out_i+2] = in_v;
-        out_i+=4;
+        outRGBA[out_i + 1] = in_v;
+        outRGBA[out_i + 2] = in_v;
+        out_i += 4;
     }
+}
+
+
+void cvtLinkEdges(
+    std::vector<edg_float> &edges, 
+    std::vector<grad_float> &gradI, 
+    uint32_t rows, 
+    uint32_t cols
+){
+
+
+    uint32_t i, nofEdges = edges.size();
+    uint32_t dir;
+
+    for( i=0; i<nofEdges; i++){
+        dir = (uint32_t) (edges[i].dir / 45.0f);
+    }
+
 }
