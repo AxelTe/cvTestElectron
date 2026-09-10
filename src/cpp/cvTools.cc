@@ -474,10 +474,12 @@ void cvtLinkEdges(
 
 
     uint32_t i, nofEdges = edges.size();
-    uint32_t dir;
+    float dr, dq;
 
     for( i=0; i<nofEdges; i++){
-        dir = (uint32_t) (edges[i].dir / 45.0f);
+        dr = roundf(edges[i].dir / 45.0f);
+        dq = edges[i].dir - (dr*45.0f);
+
     }
 
 }
