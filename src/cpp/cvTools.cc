@@ -5,6 +5,11 @@
 
 #include "cvTools.h"
 
+static const int8_t _px[8] = {0, -1, -1, -1, 0, 1, 1, 1};
+static const int8_t _py[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+static const int8_t _sx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+static const int8_t _sy[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+
 /**
  * Performs edge-thinning via non-local maxima suppression
  * \param mag gradient-magnitude image, type 'cv::Mat, cv_32FC1', value range [0.0 .. 1.0]
@@ -475,11 +480,16 @@ void cvtLinkEdges(
 
     uint32_t i, nofEdges = edges.size();
     float dr, dq;
+    uint32_t x,y,xp,yp;
 
     for( i=0; i<nofEdges; i++){
         dr = roundf(edges[i].dir / 45.0f);
         dq = edges[i].dir - (dr*45.0f);
-
+        x = edges[i].x;
+        y = edges[i].y;
+        xp = x + ((uint32_t) _px[(uint8_t) dr]);
+        yp = x + ((uint32_t) _py[(uint8_t) dr]);
+        edges[i].p = gradI[(yp*cols)+xp].edg;
     }
 
 }

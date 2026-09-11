@@ -96,6 +96,7 @@ Napi::Value process(const Napi::CallbackInfo &info)
     magMax = cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, gradThLow, rows, cols);
     nofEdges = cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgL_float, gradThLow, rows, cols);
     cvtEdgHistogram(imgLevels[0].edgL_float, imgLevels[0].histEdges);
+    cvtLinkEdges(imgLevels[0].edgL_float, imgLevels[0].gradI_float, rows, cols);
     //
     icols = cols;
     irows = rows;

@@ -30,6 +30,8 @@ struct edg_float
     float y;
     float mag;
     float dir;
+    uint32_t p;
+    uint32_t s;
 };
 
 struct grad_float
