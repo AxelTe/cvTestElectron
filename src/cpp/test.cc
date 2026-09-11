@@ -133,6 +133,45 @@ Napi::Array getHistEdges(const Napi::CallbackInfo& info) {
 }
 
 /**
+ *  Returning a std::vector<uint_32> as a JavaScript Array
+ */
+Napi::Array getGradient(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    uint32_t x,y,c0,c;
+
+    // Create a new JS Array with pre-allocated length
+    Napi::Array jsArray = Napi::Array::New(env, (242));
+
+    // check input 'info' structure
+    if (info.Length() != 2 )
+    {
+        Napi::TypeError::New(env, "expected: (x0, y0)")
+            .ThrowAsJavaScriptException();
+        return jsArray;
+    }
+    // extract single arguments from 'info' structure
+    uint32_t x0 = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t y0 = info[1].As<Napi::Number>().Uint32Value();
+        
+   
+
+#if 1
+    for(y=0; y< 11; y++){
+        c0 = (y+y0-5)*cols;
+        for(x=0; x<11; x++){
+            c = c0+(x+x0-5);
+            if(c>=0 && c <size){
+                jsArray.Set((y*(22))+(2*x), Napi::Number::New(env, 10.1)); //imgLevels[0].gradI_float[c].mag));
+                jsArray.Set((y*(22))+(2*x+1), Napi::Number::New(env,10.2)); // imgLevels[0].gradI_float[c].dir));
+            }
+        }
+    }
+#endif
+
+    return jsArray;
+}
+
+/**
  *
  */
 Napi::Value show(const Napi::CallbackInfo &info)
@@ -228,7 +267,7 @@ Napi::Value show(const Napi::CallbackInfo &info)
     case 2:
         // edges on grey level
         cvtGrey2RGBA(imgLevels[0].greyI_float, pixels, size);
-        cvtEdgPts2RGBA(imgLevels[0].edgL_float, pixels, rows, cols, 0, 0);
+        cvtLinkPts2RGBA(imgLevels[0].edgL_float, pixels, rows, cols, 0, 0);
         break;
     case 1:
         // gradient magnitude
@@ -248,6 +287,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set(Napi::String::New(env, "initialize"), Napi::Function::New(env, initialize));
     exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, process));
     exports.Set("getHistEdges", Napi::Function::New(env, getHistEdges));
+    exports.Set("getGradient", Napi::Function::New(env, getGradient));
     exports.Set(Napi::String::New(env, "show"), Napi::Function::New(env, show));
     return exports;
 }

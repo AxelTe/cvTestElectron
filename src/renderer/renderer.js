@@ -162,6 +162,15 @@ cv.addEventListener('imgDispError', (e) => {
 
 cv.addEventListener('loadFromRoot', (e) => {
   // console.log('loadFromRoot'+" "+e.detail.msg);
-  window.electronAPI.loadFromRoot(e.detail.msg);
+  let msg = e.detail.msg;
+  msg.meaning = "loadFromRoot";
+  window.electronAPI.loadFromRoot(msg);
+});
+//
+cv.addEventListener('requestGradientInfo', (e) => {
+  console.log('requestGradientInfo', e.detail.msg);
+  let msg = e.detail.msg;
+  msg.meaning = "requestGradientInfo";
+  window.electronAPI.loadFromRoot(msg);
 });
 

@@ -6,12 +6,13 @@ class mouseOnCanvas {
     #cvin = undefined;
     #cvout = undefined;
     #magCtx = undefined;
-    #zoomLevel = 2.5;
+    #zoomLevel = 5.0;
     #magSize = 150;
     #sourceSize = this.#magSize / this.#zoomLevel;
     #magnifierBtn = undefined;
     #handleMouseMove = null;
     #backBtn = undefined;
+    #gradBtn = undefined;
 
 
     constructor(container, cvin, cvout) {
@@ -49,9 +50,14 @@ class mouseOnCanvas {
         //
         this.#container.removeEventListener('mousemove', this.#handleMouseMove);
         this.#handleMouseMove = null;
+        //
         self.#magnifierBtn = el.appendChild( document.createElement('button') );
         self.#magnifierBtn.innerText = "magnify";
         self.#magnifierBtn.addEventListener("click", (event) => self.onMagnifierBtn(self,event));
+        //
+        self.#gradBtn = el.appendChild( document.createElement('button') );
+        self.#gradBtn.innerText = "gradient";
+        self.#gradBtn.addEventListener("click", (event) => self.onGradBtn(mouseX, mouseY, self,event));
         //
         self.#backBtn = el.appendChild( document.createElement('button') );
         self.#backBtn.innerText = "back";
@@ -63,6 +69,18 @@ class mouseOnCanvas {
         console.log("onMagnifierBtn");
         self.#handleMouseMove = (event) => this.onMouseMove(this, event);
         this.#container.addEventListener('mousemove', self.#handleMouseMove);
+        this.offContextMenu(self,event);
+    }
+
+    onGradBtn(x,y,self,event){
+        console.log("onGradBtn");
+        let x0 = x * (self.#cvin.width/self.#cvin.clientWidth);
+        let y0 = y* (self.#cvin.height/self.#cvin.clientHeight);
+        let requestGradientInfoEvent = new CustomEvent('requestGradientInfo',{ 
+            bubbles: true, 
+            detail: { msg: {x0: x0, y0: y0} } 
+        });
+        self.#cvin.dispatchEvent(requestGradientInfoEvent);
         this.offContextMenu(self,event);
     }
 

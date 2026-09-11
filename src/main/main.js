@@ -169,8 +169,19 @@ function sendInfoToPyramidImg(msg) {
 
 // Empfängt den Wert vom Renderer
 ipcMain.on('loadFromRoot', (event, data) => {
-  //console.log("loadFromRoot", data);
-  imgseq.loadImg(data.id, data.rows, data.cols, data.id)
+  console.log("loadFromRoot", data);
+  if (data.hasOwnProperty("meaning")) {
+    switch(data.meaning){
+      case "loadFromRoot":
+        imgseq.loadImg(data.id, data.rows, data.cols);
+        break;
+      case "requestGradientInfo":
+        imgseq.loadGradientInfo(data.x0, data.y0);
+        console.log("requestGradientInfo", data);
+        break;
+    }
+  }
+  
 });
 
 
@@ -190,7 +201,7 @@ imgseq.on("imgseqInfo", function (msg) {
     sendInfoToMainGUI(msg);
     imgseq.showImg(2);
     if(config.imagePyramids>1) imgseq.showImg(12);
-    imgseq.getHistEdges();
+    //imgseq.getHistEdges();
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
