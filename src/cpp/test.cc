@@ -138,6 +138,7 @@ Napi::Array getHistEdges(const Napi::CallbackInfo& info) {
 Napi::Array getGradient(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     uint32_t x,y,c0,c;
+    float m,d;
 
     // Create a new JS Array with pre-allocated length
     Napi::Array jsArray = Napi::Array::New(env, (242));
@@ -161,8 +162,14 @@ Napi::Array getGradient(const Napi::CallbackInfo& info) {
         for(x=0; x<11; x++){
             c = c0+(x+x0-5);
             if(c>=0 && c <size){
-                jsArray.Set((y*(22))+(2*x), Napi::Number::New(env, 10.1)); //imgLevels[0].gradI_float[c].mag));
-                jsArray.Set((y*(22))+(2*x+1), Napi::Number::New(env,10.2)); // imgLevels[0].gradI_float[c].dir));
+                m = imgLevels[0].gradI_float[c].mag;
+                d = imgLevels[0].gradI_float[c].dir;
+                if(imgLevels[0].gradI_float[c].edg < 0.01){
+                    m = 0.;
+                    d = 0.;
+                }
+                jsArray.Set((y*(22))+(2*x), Napi::Number::New(env, m));
+                jsArray.Set((y*(22))+(2*x+1), Napi::Number::New(env, d));
             }
         }
     }

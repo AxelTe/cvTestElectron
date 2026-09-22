@@ -161,6 +161,25 @@ class imgseq extends EventEmitter {
 
     /**
      * 
+     * @fires imgseq#imgseqInfo
+     * @fires imgseq#imgseqError
+     * @returns {void}
+     */
+    loadGradientInfo(x0, y0) {
+
+        let t0 = Date.now();
+        try {
+            const result = myAddon.getGradient(x0,y0);
+            //@@@ console.log("imgseq.loadGradientInfo> myAddon.getGradient() returned:", result, x0, y0);
+            // send processing time to renderer
+            this.emit("imgseqInfo", { gradientInfo: result, x0: x0, y0: y0 });
+        } catch (error) {
+            console.log("imgseq.loadGradientInfo> Error: ", error);
+        }
+    }
+
+    /**
+     * 
      */
     processImg() {
         console.log("imgseq.processImg> ");

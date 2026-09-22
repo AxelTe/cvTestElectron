@@ -5,10 +5,10 @@
 
 #include "cvTools.h"
 
-static const int8_t _px[8] = {0, -1, -1, -1, 0, 1, 1, 1};
-static const int8_t _py[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
-static const int8_t _sx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
-static const int8_t _sy[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+static const int8_t _px[8] = { 0,  1, -1, -1,  0,  1,  1,  1};
+static const int8_t _py[8] = { 1, -1,  0, -1, -1, -1,  0,  1};
+static const int8_t _sx[8] = { 0,  1,  1,  1,  0, -1, -1, -1};
+static const int8_t _sy[8] = {-1, -1,  0,  1,  1,  1,  0, -1};
 
 /**
  * Performs edge-thinning via non-local maxima suppression
@@ -367,6 +367,7 @@ void cvtLinkEdges(
 
         // predecessor
         dri = (uint8_t) dr;
+        dri = (dri > 7) ? (dri-8) : dri;
         xp = x + ((uint32_t)_px[dri]);
         yp = y + ((uint32_t)_py[dri]);
         if (xp >= 0 && xp < cols && yp >= 0 && yp < rows)
@@ -374,11 +375,11 @@ void cvtLinkEdges(
             pid = gradI[(yp * cols) + xp].edg;
             if(pid == 0){
                 if(dq > 0){
-                    dri = dri+1;
-                    if(dri == 8) dri = 0; 
-                } else  {
                     dri = dri-1;
                     if(dri == -1) dri = 7; 
+                } else  {
+                    dri = dri+1;
+                    if(dri == 8) dri = 0; 
                 }
                 xp = x + ((uint32_t)_px[dri]);
                 yp = y + ((uint32_t)_py[dri]);
@@ -395,6 +396,7 @@ void cvtLinkEdges(
         }
         // sucessor
         dri = (uint8_t) dr;
+        dri = (dri > 7) ? (dri-8) : dri;
         xp = x + ((uint32_t)_sx[dri]);
         yp = y + ((uint32_t)_sy[dri]);
         if (xp >= 0 && xp < cols && yp >= 0 && yp < rows)
@@ -402,11 +404,11 @@ void cvtLinkEdges(
             pid = gradI[(yp * cols) + xp].edg;
             if(pid == 0){
                 if(dq > 0){
-                    dri = dri+1;
-                    if(dri == 8) dri = 0; 
-                } else  {
                     dri = dri-1;
                     if(dri == -1) dri = 7; 
+                } else  {
+                    dri = dri+1;
+                    if(dri == 8) dri = 0; 
                 }
                 xp = x + ((uint32_t)_sx[dri]);
                 yp = y + ((uint32_t)_sy[dri]);

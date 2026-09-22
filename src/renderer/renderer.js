@@ -17,7 +17,12 @@ for(let i=0; i<ptimes.length; i++){
   ptimes[i] = {min: 1000, max:0, val: 0};
 }
 
-let magTool = new mouseOnCanvas(document.getElementById('mainFrame'), cv, document.getElementById('magnifier'));
+let moc = new mouseOnCanvas(
+  document.getElementById('mainFrame'), 
+  cv, 
+  document.getElementById('magnifier'),
+  document.getElementById('gradientInfo')
+);
 
 //
 // button function
@@ -147,6 +152,10 @@ window.electronAPI.onInfo((msg) => {
 
   if (msg.hasOwnProperty("histEdges")) {
     console.log("histEdges", msg.histEdges.slice(0,30));
+  }
+  if (msg.hasOwnProperty("gradientInfo")) {
+    console.log("gradientInfo", msg);
+    moc.displayGradientInfo(msg.gradientInfo, msg.x0, msg.y0)
   }
 
 });

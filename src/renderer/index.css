@@ -67,6 +67,23 @@ video {
     flex-direction: column;
  }
 
+ .grad-grid-table {
+  display: grid;
+  grid-template-columns: repeat(23, 1fr); 
+  width: 100%;
+  font-size: 10px;
+}
+
+.grad-cell {
+  /* Sorgt dafür, dass überlaufender Text (z.B. lange Nummern/Wörter) die Spalte nicht verzerrt */
+  min-width: 0; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* Optional: Verhindert Zeilenumbruch */
+  border: 1px solid #ccc; /* Nur zur besseren Sichtbarkeit */
+  padding: 2px;
+}
+
 .tableCol {
     border: 0px;
     display: flex;
@@ -88,7 +105,7 @@ video {
 }
 
 .tableElemText {
-    flex: 1 1 0;
+    flex: 1 1 0px;
     /*flex-grow: 1;*/
     border: 1px solid #031424;
     text-align: center;
