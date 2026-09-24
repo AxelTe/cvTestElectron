@@ -95,8 +95,9 @@ Napi::Value process(const Napi::CallbackInfo &info)
     cvtGauss5x5(imgLevels[0].greyI_float, imgLevels[0].tmpI_float, imgLevels[0].gaussI_float, gmask32F, rows, cols);
     magMax = cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, gradThLow, rows, cols);
     nofEdges = cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgL_float, gradThLow, rows, cols);
-    cvtEdgHistogram(imgLevels[0].edgL_float, imgLevels[0].histEdges);
-    cvtLinkEdges(imgLevels[0].edgL_float, imgLevels[0].gradI_float, rows, cols);
+    //cvtEdgHistogram(imgLevels[0].edgL_float, imgLevels[0].histEdges);
+    //cvtEdgLinkHistogram(imgLevels[0].gradI_float, imgLevels[0].edgL_float, imgLevels[0].histEdges, rows, cols);
+    //cvtLinkEdges(imgLevels[0].edgL_float, imgLevels[0].gradI_float, rows, cols);
     //
     icols = cols;
     irows = rows;
@@ -130,6 +131,43 @@ Napi::Array getHistEdges(const Napi::CallbackInfo& info) {
     }
 
     return jsArray;
+}
+
+
+/*
+struct edg_float
+{
+    uint32_t xi;
+    uint32_t yi;
+    float xf;
+    float yf;
+    float mag;
+    float dir;
+    uint32_t p;
+    uint32_t s;
+};
+*/
+// Function converting std::vector<DataItem> to Napi::Array
+Napi::Value getEdgePts(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    Napi::Array result = Napi::Array::New(env, imgLevels[0].edgL_float.size());
+
+    for (size_t i = 0; i < imgLevels[0].edgL_float.size(); ++i) {
+        Napi::Object obj = Napi::Object::New(env);
+        
+        // Map C++ struct properties to JS Object keys
+        obj.Set(Napi::String::New(env, "xi"), Napi::Number::New(env, imgLevels[0].edgL_float[i].xi));
+        obj.Set(Napi::String::New(env, "yi"), Napi::Number::New(env, imgLevels[0].edgL_float[i].yi));
+        obj.Set(Napi::String::New(env, "xf"), Napi::Number::New(env, imgLevels[0].edgL_float[i].xf));
+        obj.Set(Napi::String::New(env, "yf"), Napi::Number::New(env, imgLevels[0].edgL_float[i].yf));
+        obj.Set(Napi::String::New(env, "mag"), Napi::Number::New(env, imgLevels[0].edgL_float[i].mag));
+        obj.Set(Napi::String::New(env, "dir"), Napi::Number::New(env, imgLevels[0].edgL_float[i].dir));
+
+        result[i] = obj;
+    }
+
+    return result;
 }
 
 /**
@@ -293,6 +331,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     exports.Set(Napi::String::New(env, "initialize"), Napi::Function::New(env, initialize));
     exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, process));
+    exports.Set("getEdgePts", Napi::Function::New(env, getEdgePts));
     exports.Set("getHistEdges", Napi::Function::New(env, getHistEdges));
     exports.Set("getGradient", Napi::Function::New(env, getGradient));
     exports.Set(Napi::String::New(env, "show"), Napi::Function::New(env, show));

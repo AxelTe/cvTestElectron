@@ -199,9 +199,9 @@ imgseq.on("imgseqInfo", function (msg) {
   }
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
-    imgseq.showImg(2);
+    imgseq.showImg(0);
     if(config.imagePyramids>1) imgseq.showImg(12);
-    //imgseq.getHistEdges();
+    imgseq.getEdgePts();
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
@@ -215,6 +215,9 @@ imgseq.on("imgseqInfo", function (msg) {
       mainWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
       if( imgPyramidWin != undefined) imgPyramidWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
     }
+  }
+  if (msg.hasOwnProperty("edgePts")) {
+    sendInfoToMainGUI(msg);
   }
   if (msg.hasOwnProperty("histEdges")) {
     sendInfoToMainGUI(msg);

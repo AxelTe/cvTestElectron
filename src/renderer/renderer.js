@@ -21,7 +21,8 @@ let moc = new mouseOnCanvas(
   document.getElementById('mainFrame'), 
   cv, 
   document.getElementById('magnifier'),
-  document.getElementById('gradientInfo')
+  document.getElementById('gradientInfo'),
+  imgDisp
 );
 
 //
@@ -157,7 +158,10 @@ window.electronAPI.onInfo((msg) => {
     console.log("gradientInfo", msg);
     moc.displayGradientInfo(msg.gradientInfo, msg.x0, msg.y0)
   }
-
+  if (msg.hasOwnProperty("edgePts")) {
+    console.log("edgePts");
+    imgDisp.edges(msg.edgePts);
+  }
 });
 
 /**

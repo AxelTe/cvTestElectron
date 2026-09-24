@@ -20,7 +20,9 @@ class imgdisp {
         this.end = 0;
         this.id = 0;
         this.dispQueueTimer = null;
-        
+        this.imgD = null;
+        this.edgPts = null;
+
         const ctx = this.cv.getContext('2d');
         ctx.font = '30px Arial';
         ctx.fillStyle = '#2b2b2b';      // Text color
@@ -34,9 +36,10 @@ class imgdisp {
      */
     dispImg( imgU8Array , rows, cols, pTimes){
         const ctx = this.cv.getContext('2d');
-        const clampedArray = new Uint8ClampedArray(imgU8Array); //.data);
-        const imageData = new ImageData(clampedArray, cols, rows);
-        ctx.putImageData(imageData, 0, 0);
+        let clampedArr = new Uint8ClampedArray(imgU8Array); //.data);
+        this.imgD = new ImageData(clampedArr, cols, rows);
+        ctx.putImageData(this.imgD, 0, 0);
+       
         //
         let tstr = "Proc. time: ";
         tstr = tstr + pTimes[0].min + ".."+pTimes[0].val+".."+pTimes[0].max;
@@ -50,6 +53,26 @@ class imgdisp {
         } else {
             this.id++;
         }
+    }
+
+    /**
+     * 
+     * @param {*} edgPts 
+     */
+    edges( edgPts ){
+        this.edgPts = edgPts;
+        const ctx = this.cv.getContext('2d');
+        let radius = 1.0;
+        // 
+        let fillStyle = ctx.fillStyle;
+        ctx.fillStyle = "#FF0000"
+        ctx.beginPath();
+        for(let i=0; i<edgPts.length; i++){
+            ctx.moveTo(edgPts[i].xf + radius, edgPts[i].yf);
+            ctx.arc(edgPts[i].xf, edgPts[i].yf, radius, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.fillStyle = fillStyle;    
     }
 
 

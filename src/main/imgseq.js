@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const bmp = require('@vingle/bmp-js');
 const sharp = require('sharp');
+const process = require('node:process');
 const EventEmitter = require('node:events');
 //const { toUnicode } = require('node:punycode');
 
@@ -33,13 +34,32 @@ class imgseq extends EventEmitter {
         this.id = -1;
     }
 
+    getEdgePts(){
+        console.log("imgseq.getEdgePts>");
+        try {
+            const result = myAddon.getEdgePts();
+            console.log("imgseq.getEdgePts> myAddon.getEdgePts() returned:", result.length);
+            // send processing time to renderer
+            this.emit("imgseqInfo", { edgePts: result });
+        } catch (error) {
+            console.log("imgseq.getEdgePts> Error: ", error);
+            return
+        }
+    }
+
+
     getHistEdges(){
         console.log("imgseq.getHistEdges>");
         try {
             const result = myAddon.getHistEdges();
             console.log("imgseq.getHistEdges> myAddon.getHistEdges() returned:", result.length);
+            //console.log(result);
+            for(let i=0; i<result.length; i++){
+                process.stdout.write(result[i].toString());
+                process.stdout.write(", ");
+            }
             // send processing time to renderer
-            this.emit("imgseqInfo", { histEdges: result });
+            //this.emit("imgseqInfo", { histEdges: result });
         } catch (error) {
             console.log("imgseq.getHistEdges> Error: ", error);
             return

@@ -5,8 +5,11 @@
 
 #include "cvTools.h"
 
-static const int8_t _px[8] = { 0,  1, -1, -1,  0,  1,  1,  1};
-static const int8_t _py[8] = { 1, -1,  0, -1, -1, -1,  0,  1};
+static const int8_t _lx[8] = { 1,  1,  0, -1, -1, -1,  0,  1};
+static const int8_t _ly[8] = { 0,  1,  1,  1,  0, -1, -1, -1};
+
+static const int8_t _px[8] = { 0, -1, -1, -1,  0,  1,  1,  1};
+static const int8_t _py[8] = { 1,  1,  0, -1, -1, -1,  0,  1};
 static const int8_t _sx[8] = { 0,  1,  1,  1,  0, -1, -1, -1};
 static const int8_t _sy[8] = {-1, -1,  0,  1,  1,  1,  0, -1};
 
@@ -25,9 +28,10 @@ static const int8_t _sy[8] = {-1, -1,  0,  1,  1,  1,  0, -1};
 
 uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> &edges, float th, uint32_t rows, uint32_t cols)
 {
-    float aF, mF1, mF2;
+    float aF, mF1, mF2, xf, yf;
     uint32_t cnt = 0;
-    uint32_t c, c0, c1, size;
+    uint32_t i, j, c, c0, c1, size;
+    uint32_t u,v;
 
     // work
     //
@@ -93,14 +97,37 @@ uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> 
         {
             if (cnt < edges.size())
             {
-                edges[cnt].x = c % cols;
-                edges[cnt].y = c / cols;
+                edges[cnt].xi = (uint32_t) (c % cols);
+                edges[cnt].yi = (uint32_t) (c / cols);
                 edges[cnt].mag = gradI[c].mag;
                 edges[cnt].dir = gradI[c].dir;
                 cnt++;
                 gradI[c].edg = cnt;
             }
         }
+    }
+
+    //
+    // sub pixel precision
+    for (i = 0; i < cnt; i++)
+    {
+        mF1 = edges[i].mag;
+        mF2 = edges[i].dir;
+        u = edges[i].xi;
+        v = edges[i].yi;
+        xf = edges[i].mag * ((float) u);
+        yf = edges[i].mag * ((float) v);
+        for(j=0; j<8; j++){
+            c = (v + _ly[j])*cols + (u + _lx[j]);
+            mF1 += gradI[c].mag;
+            mF2 += gradI[c].dir;
+            xf += gradI[c].mag * ((float) u + _lx[j]);
+            yf += gradI[c].mag * ((float) v + _ly[j]);
+        }
+        edges[i].xf = xf / mF1;
+        edges[i].yf = yf / mF1;
+        edges[i].mag = mF1 / 9.0; 
+        edges[i].dir = mF1 / 9.0; 
     }
 
     return (cnt);
@@ -121,6 +148,39 @@ void cvtEdgHistogram(
         val = edges[i].mag;
         val = val > 255. ? 255. : val;
         hist[(uint8_t)val]++;
+    }
+}
+
+/**
+ * 
+ */
+void cvtEdgLinkHistogram(
+    std::vector<grad_float> &gradI,
+    std::vector<edg_float> &edges,
+    std::vector<uint32_t> &hist,
+    uint32_t rows, 
+    uint32_t cols)
+{
+    uint32_t nofEdges = edges.size();
+    uint32_t xi,yi,i,xj,yj,j;
+    uint8_t val;
+
+    // reset histogram
+    for (uint32_t i = 0; i < 256; i++)
+        hist[i] = 0;
+
+    // loop over edge points
+    for (i = 0; i < nofEdges; i++)
+    {
+        xi = edges[i].xi;
+        yi = edges[i].yi;
+        val = 0;
+        for(j=0; j<8; j++){
+            xj = xi + _lx[j];
+            yj = yi + _ly[j];
+            if( gradI[(yj*cols)+xj].edg>0) val += (1<<j);
+        }
+        hist[val]++;
     }
 }
 
@@ -155,8 +215,8 @@ void cvtEdgPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t ro
     uint32_t xi, yi, p;
     for (uint32_t i = 0; i < nofEdgs; i++)
     {
-        xi = (uint32_t)edges[i].x;
-        yi = (uint32_t)edges[i].y;
+        xi = edges[i].xi;
+        yi = edges[i].yi;
         xi = xi + xoff;
         yi = yi + yoff;
         if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
@@ -362,8 +422,8 @@ void cvtLinkEdges(
     {
         dr = roundf(edges[i].dir / 45.0f);
         dq = edges[i].dir - (dr * 45.0f);
-        x = edges[i].x;
-        y = edges[i].y;
+        x = edges[i].xi;
+        y = edges[i].yi;
 
         // predecessor
         dri = (uint8_t) dr;
@@ -374,7 +434,7 @@ void cvtLinkEdges(
         {
             pid = gradI[(yp * cols) + xp].edg;
             if(pid == 0){
-                if(dq > 0){
+                if(dq < 0.){
                     dri = dri-1;
                     if(dri == -1) dri = 7; 
                 } else  {
@@ -439,8 +499,8 @@ void cvtLinkPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t r
     uint32_t xi, yi, p;
     for (uint32_t i = 0; i < nofEdgs; i++)
     {
-        xi = (uint32_t)edges[i].x;
-        yi = (uint32_t)edges[i].y;
+        xi = edges[i].xi;
+        yi = edges[i].yi;
         xi = xi + xoff;
         yi = yi + yoff;
         if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)

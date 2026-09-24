@@ -18,14 +18,14 @@ class mouseOnCanvas {
     #mouseY = 0;
 
 
-    constructor(container, cvin, cvout, gradInfo) {
+    constructor(container, cvin, cvout, gradInfo, imgDisp) {
         // canvas object
         this.#container = container;
         this.#cvin = cvin;
         this.#cvout = cvout;
         this.#magCtx = this.#cvout.getContext('2d');
         this.#gradInfoEl = gradInfo;
-
+        this.imgDisp = imgDisp;
 
         this.#container.addEventListener('mouseleave', () => {
             this.#cvout.style.display = 'none';
@@ -138,7 +138,7 @@ class mouseOnCanvas {
      * @param {*} self 
      * @param {*} e 
      */
-    onMouseMove(self, e) {
+    async onMouseMove(self, e) {
         const rect = self.#container.getBoundingClientRect();
 
         // Mausposition relativ zum Canvas berechnen
@@ -162,12 +162,31 @@ class mouseOnCanvas {
             // console.log(e.clientX, e.clientY, mouseX, mouseY, sourceX, sourceY);
 
             // Lupen-Canvas leeren und Ausschnitt skaliert hineinzeichnen
+            const bitmap = await createImageBitmap(self.imgDisp.imgD, sourceX, sourceY, self.#sourceSize, self.#sourceSize);
             self.#magCtx.clearRect(0, 0, self.#magSize, self.#magSize);
-            self.#magCtx.drawImage(
-                self.#cvin,
-                sourceX, sourceY, self.#sourceSize, self.#sourceSize, // Quell-Ausschnitt
-                0, 0, self.#magSize, self.#magSize                       // Ziel-Position & Größe
-            );
+            self.#magCtx.drawImage(bitmap, 0, 0, self.#magSize, self.#magSize);
+            //
+            if (self.imgDisp.edgPts !== null) {
+                let xf,yf;
+                let radius = 1.0;
+                let fillStyle = self.#magCtx.fillStyle;
+                self.#magCtx.fillStyle = "#FF0000"
+                self.#magCtx.beginPath();
+                for (let i = 0; i < self.imgDisp.edgPts.length; i++) {
+                    xf = self.imgDisp.edgPts[i].xf - sourceX - self.#sourceSize / 2;
+                    yf = self.imgDisp.edgPts[i].yf - sourceY - self.#sourceSize / 2;
+                    let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
+                    if(distance<self.#magSize){
+                        xf = (xf * self.#zoomLevel); // + self.#magSize/2;
+                        yf = (yf * self.#zoomLevel); // + self.#magSize/2;
+                        self.#magCtx.moveTo((xf), (yf));
+                        self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
+                    }
+                }
+                self.#magCtx.fill();
+                self.#magCtx.fillStyle = fillStyle;
+
+            }
         } else {
             self.#cvout.style.display = 'none';
         }

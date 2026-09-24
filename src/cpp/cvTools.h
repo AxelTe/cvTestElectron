@@ -2,32 +2,13 @@
 #include <cstdint>
 #include <vector>
 
-/*
-struct grad32F
-{
-    float dx;
-    float dy;
-    float mag;
-    float dir;
-    float edg;
-};
-
-struct edgPtF
-{
-    float x;
-    float y;
-    float mag;
-    float dir;
-};
-*/
-//
-//
-//
 
 struct edg_float
 {
-    float x;
-    float y;
+    uint32_t xi;
+    uint32_t yi;
+    float xf;
+    float yf;
     float mag;
     float dir;
     uint32_t p;
@@ -56,6 +37,7 @@ struct imgLevel
 
 uint32_t cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> &edges, float th, uint32_t rows, uint32_t cols);
 void cvtEdgHistogram(std::vector<edg_float> &edges, std::vector<uint32_t> &hist);
+void cvtEdgLinkHistogram(std::vector<grad_float> &gradI,std::vector<edg_float> &edges, std::vector<uint32_t> &hist, uint32_t rows, uint32_t cols);
 void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size);
 void cvtEdgPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff);
 void cvtGrey2RGBA(std::vector<float> &greyI32F, uint8_t *outRGBA, uint32_t size);
