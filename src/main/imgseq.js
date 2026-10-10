@@ -29,20 +29,20 @@ class imgseq extends EventEmitter {
         this.rows = 0;
         this.cols = 0;
         this.nofLevels = 0;
-        this.gradThLow = 2;
-        this.gradThHigh = 10;
+        this.gradThLow = 0.0;
+        this.gradThHigh = 0.0;
         this.id = -1;
     }
 
-    getEdgePts(){
-        console.log("imgseq.getEdgePts>");
+    getEdgeData(){
+        console.log("imgseq.getEdgeData>");
         try {
-            const result = myAddon.getEdgePts();
-            console.log("imgseq.getEdgePts> myAddon.getEdgePts() returned:", result.length);
+            const result = myAddon.getEdgeData();
+            console.log("imgseq.getEdgeData> myAddon.getEdgeData() returned:", result.length);
             // send processing time to renderer
-            this.emit("imgseqInfo", { edgePts: result });
+            this.emit("imgseqInfo", { edgeData: result });
         } catch (error) {
-            console.log("imgseq.getEdgePts> Error: ", error);
+            console.log("imgseq.getEdgeData> Error: ", error);
             return
         }
     }
@@ -54,7 +54,7 @@ class imgseq extends EventEmitter {
             const result = myAddon.getHistEdges();
             console.log("imgseq.getHistEdges> myAddon.getHistEdges() returned:", result.length);
             //console.log(result);
-            for(let i=0; i<result.length; i++){
+            for(let i=0; i<30; i++){
                 process.stdout.write(result[i].toString());
                 process.stdout.write(", ");
             }
@@ -75,7 +75,7 @@ class imgseq extends EventEmitter {
      * @param {number} config.imgArrLen "size of internal image array"
      * @returns {void}
      */
-    start(config, nofLevels) {
+    start(config, nofLevels, gradThLow, gradThHigh) {
         let valid = true;
         if (config.hasOwnProperty("path")) this.path = config.path;
         else valid = false;
@@ -88,6 +88,8 @@ class imgseq extends EventEmitter {
             return;
         }
         this.nofLevels = nofLevels;
+        this.gradThHigh = gradThHigh;
+        this.gradThLow = gradThLow;
 
         let fname = this.path + "\\" + this.seqname;
         console.log("imgseq.start:", fname);

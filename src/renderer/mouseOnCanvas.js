@@ -7,8 +7,9 @@ class mouseOnCanvas {
     #cvout = undefined;
     #magCtx = undefined;
     #zoomLevel = 5.0;
-    #magSize = 150;
+    #magSize = 150.0;
     #sourceSize = this.#magSize / this.#zoomLevel;
+    #contourBtn = undefined;
     #magnifierBtn = undefined;
     #handleMouseMove = null;
     #backBtn = undefined;
@@ -40,7 +41,8 @@ class mouseOnCanvas {
         this.#gradInfoEl.style.top = this.#mouseY + "px";
         this.#gradInfoEl.style.left = this.#mouseX + "px";
 
-        let nofR = Math.round(Math.sqrt(data.length / 2));
+        let nofTabs = 3;
+        let nofR = Math.round(Math.sqrt(data.length / nofTabs));
         let elt, elc, r, c;
 
         //
@@ -55,15 +57,25 @@ class mouseOnCanvas {
             for (c = 0; c < nofR; c++) {
                 elc = elt.appendChild(document.createElement('div'));
                 elc.classList.add("grad-cell");
-                elc.innerText = data[r * (2 * nofR) + (2 * c)].toFixed(1);
+                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c)].toFixed(1);
             }
+            //
             elc = elt.appendChild(document.createElement('div'));
             elc.classList.add("grad-cell");
-
+            //
             for (c = 0; c < nofR; c++) {
                 elc = elt.appendChild(document.createElement('div'));
                 elc.classList.add("grad-cell");
-                elc.innerText = data[r * (2 * nofR) + (2 * c + 1)].toFixed(1);
+                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c + 1)].toFixed(1);
+            }
+            //
+            elc = elt.appendChild(document.createElement('div'));
+            elc.classList.add("grad-cell");
+            //
+            for (c = 0; c < nofR; c++) {
+                elc = elt.appendChild(document.createElement('div'));
+                elc.classList.add("grad-cell");
+                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c + 2)].toFixed(1);
             }
         }
 
@@ -91,6 +103,10 @@ class mouseOnCanvas {
         this.#container.removeEventListener('mousemove', this.#handleMouseMove);
         this.#handleMouseMove = null;
         //
+        self.#contourBtn = el.appendChild(document.createElement('button'));
+        self.#contourBtn.innerText = "contours";
+        self.#contourBtn.addEventListener("click", (event) => self.onContourBtn(self, event));
+        //
         self.#magnifierBtn = el.appendChild(document.createElement('button'));
         self.#magnifierBtn.innerText = "magnify";
         self.#magnifierBtn.addEventListener("click", (event) => self.onMagnifierBtn(self, event));
@@ -104,6 +120,14 @@ class mouseOnCanvas {
         self.#backBtn.addEventListener("click", (event) => self.offContextMenu(self, event));
 
     }
+
+    onContourBtn(self, event) {
+        console.log("onContourBtn");
+        self.#handleMouseMove = (event) => this.onMouseMove(this, event);
+        //this.#container.addEventListener('mousemove', self.#handleMouseMove);
+        this.offContextMenu(self, event);
+    }
+
 
     onMagnifierBtn(self, event) {
         console.log("onMagnifierBtn");
@@ -154,38 +178,84 @@ class mouseOnCanvas {
             self.#cvout.style.top = `${e.clientY - self.#magSize / 2}px`;
 
             // Quellbereich berechnen, der in der Lupe angezeigt werden soll
-            const sourceX = (mouseX * (self.#cvin.width / self.#cvin.clientWidth)) - self.#sourceSize / 2;
-            const sourceY = (mouseY * (self.#cvin.height / self.#cvin.clientHeight)) - self.#sourceSize / 2;
+            let sourceX = (parseFloat(mouseX *self.#cvin.width) / parseFloat(self.#cvin.clientWidth)) - (0.5*self.#sourceSize);
+            let sourceY = (parseFloat(mouseY *self.#cvin.height) / parseFloat(self.#cvin.clientHeight)) - (0.5*self.#sourceSize);
 
             // console.log("---")
-            // console.log(self.#cvin.width, self.#cvin.height, self.#cvin.clientWidth, self.#cvin.clientHeight)
-            // console.log(e.clientX, e.clientY, mouseX, mouseY, sourceX, sourceY);
+            //console.log(self.#cvin.width, self.#cvin.height, self.#cvin.clientWidth, self.#cvin.clientHeight)
+            //console.log(e.clientX, e.clientY, mouseX, mouseY, sourceX, sourceY);
 
             // Lupen-Canvas leeren und Ausschnitt skaliert hineinzeichnen
             const bitmap = await createImageBitmap(self.imgDisp.imgD, sourceX, sourceY, self.#sourceSize, self.#sourceSize);
             self.#magCtx.clearRect(0, 0, self.#magSize, self.#magSize);
             self.#magCtx.drawImage(bitmap, 0, 0, self.#magSize, self.#magSize);
             //
-            if (self.imgDisp.edgPts !== null) {
+            if (self.imgDisp.edgeData !== null) {
                 let xf,yf;
                 let radius = 1.0;
                 let fillStyle = self.#magCtx.fillStyle;
+                let strokeStyle = self.#magCtx.strokeStyle;
+                let edges = self.imgDisp.edgeData.edges;
+                //
+                //
+                self.#magCtx.strokeStyle = "#0000FF"
+                self.#magCtx.beginPath();
+                for (let i = 0; i < edges.length; i++) {
+                    if(edges[i].s > 0 ){
+                        xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
+                        yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
+                        if(distance<self.#magSize){
+                            xf = (xf * self.#zoomLevel);
+                            yf = (yf * self.#zoomLevel);
+                            self.#magCtx.moveTo((xf), (yf));
+                            xf = edges[edges[i].s-1].xi - sourceX + 1.5; // constant 1.5 ???
+                            yf = edges[edges[i].s-1].yi - sourceY + 1.5; // constant 1.5 ???
+                            xf = (xf * self.#zoomLevel);
+                            yf = (yf * self.#zoomLevel);
+                            self.#magCtx.lineTo((xf), (yf));
+                        }
+                    }
+                }
+                self.#magCtx.stroke();
+                //
+                radius = 1.5;
                 self.#magCtx.fillStyle = "#FF0000"
                 self.#magCtx.beginPath();
-                for (let i = 0; i < self.imgDisp.edgPts.length; i++) {
-                    xf = self.imgDisp.edgPts[i].xf - sourceX - self.#sourceSize / 2;
-                    yf = self.imgDisp.edgPts[i].yf - sourceY - self.#sourceSize / 2;
-                    let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
-                    if(distance<self.#magSize){
-                        xf = (xf * self.#zoomLevel); // + self.#magSize/2;
-                        yf = (yf * self.#zoomLevel); // + self.#magSize/2;
-                        self.#magCtx.moveTo((xf), (yf));
-                        self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
+                for (let i = 0; i < edges.length; i++) {
+                    if (edges[i].s == 0 && edges[i].p > 0) {
+                        xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
+                        yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
+                        if (distance < self.#magSize) {
+                            xf = (xf * self.#zoomLevel);
+                            yf = (yf * self.#zoomLevel);
+                            self.#magCtx.moveTo((xf), (yf));
+                            self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
+                        }
                     }
                 }
                 self.#magCtx.fill();
+                //
+                self.#magCtx.fillStyle = "#00FF00"
+                self.#magCtx.beginPath();
+                for (let i = 0; i < edges.length; i++) {
+                    if(edges[i].p == 0 && edges[i].s>0){
+                        xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
+                        yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
+                        if(distance<self.#magSize){
+                            xf = (xf * self.#zoomLevel);
+                            yf = (yf * self.#zoomLevel);
+                            self.#magCtx.moveTo((xf), (yf));
+                            self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
+                        }
+                    }
+                }
+                self.#magCtx.fill();
+                //
                 self.#magCtx.fillStyle = fillStyle;
-
+                self.#magCtx.strokeStyle = strokeStyle;
             }
         } else {
             self.#cvout.style.display = 'none';

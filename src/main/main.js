@@ -28,7 +28,8 @@ const createWindow = () => {
 
   mainWin.webContents.on('did-finish-load', () => {
     console.log("main browser window ready");
-    imgseq.start(config.imgseq, config.imagePyramids);
+    sendInfoToMainGUI({"dispConfig": config.imgDisp});
+    imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh);
   });
 
   mainWin.on("close", () => {
@@ -196,12 +197,13 @@ imgseq.on("imgseqInfo", function (msg) {
   if (msg.hasOwnProperty("loadTime")) {
     sendInfoToMainGUI(msg);
     imgseq.processImg();
+    imgseq.getHistEdges();
   }
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
     imgseq.showImg(0);
     if(config.imagePyramids>1) imgseq.showImg(12);
-    imgseq.getEdgePts();
+    imgseq.getEdgeData();
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
@@ -211,12 +213,12 @@ imgseq.on("imgseqInfo", function (msg) {
     sendInfoToMainGUI(msg);
     sendInfoToPyramidImg(msg);
     if(msg.hasOwnProperty("seqinfo")){
-      console.log("imgseq.on()>", msg)
+      //@@@console.log("imgseq.on()>", msg)
       mainWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
       if( imgPyramidWin != undefined) imgPyramidWin.setSize(msg.seqinfo.cols, Math.round(msg.seqinfo.rows*1.1), true);
     }
   }
-  if (msg.hasOwnProperty("edgePts")) {
+  if (msg.hasOwnProperty("edgeData")) {
     sendInfoToMainGUI(msg);
   }
   if (msg.hasOwnProperty("histEdges")) {

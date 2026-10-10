@@ -158,9 +158,20 @@ window.electronAPI.onInfo((msg) => {
     console.log("gradientInfo", msg);
     moc.displayGradientInfo(msg.gradientInfo, msg.x0, msg.y0)
   }
-  if (msg.hasOwnProperty("edgePts")) {
-    console.log("edgePts");
-    imgDisp.edges(msg.edgePts);
+  if (msg.hasOwnProperty("edgeData")) {
+    console.log("edgeData");
+    switch(imgDisp.config.edgeMode){
+      case 1:
+        imgDisp.contours(msg.edgeData);
+        break;
+      default:
+        imgDisp.edges(msg.edgeData);
+        break;
+    }
+  }
+  if (msg.hasOwnProperty("dispConfig")) {
+    console.log("dispConfig");
+    imgDisp.config = msg.dispConfig;
   }
 });
 
