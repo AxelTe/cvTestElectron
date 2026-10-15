@@ -9,24 +9,56 @@
 static const int8_t _lx[8] = {1, 1, 0, -1, -1, -1, 0, 1};
 static const int8_t _ly[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 static const int8_t _d180[8] = {4, 5, 6, 7, 0, 1, 2, 3};
-static const int8_t _dlink[8][3] =
+static const int8_t _dlink[8][4] =
     {
-        {6, 0, 7},
-        {0, 6, 7},
-        {0, 2, 1},
-        {2, 0, 1},
-        {2, 4, 3},
-        {4, 2, 3},
-        {4, 6, 5},
-        {6, 4, 5}};
+        {6, 0, 7, 5},
+        {0, 6, 7, 1},
+        {0, 2, 1, 7},
+        {2, 0, 1, 3},
+        {2, 4, 3, 1},
+        {4, 2, 3, 5},
+        {4, 6, 5, 3},
+        {6, 4, 5, 7}};
 static const int8_t _px[8] = {0, -1, -1, -1, 0, 1, 1, 1};
 static const int8_t _py[8] = {1, 1, 0, -1, -1, -1, 0, 1};
 static const int8_t _sx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 static const int8_t _sy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
 
 static float _sqrt2 = sqrtf(2.0);
-static float degree2rad = ((float) std::numbers::pi) / 180.;
+static float degree2rad = ((float)std::numbers::pi) / 180.;
 static float rad2degree = 1. / degree2rad;
+
+void cvtCurvatureContours(
+    std::vector<edg_float> &edges,
+    std::vector<contour> &conts)
+{
+    uint32_t c, i0, j;
+    uint32_t dirVLen = 10;
+    float dir;
+    std::vector<float> dirV;
+
+    dirV.resize(dirVLen, 0);
+
+    // loop over contours
+    for (c = 0; c < conts.size(); c++)
+    {
+        // contour start point
+        i0 = conts[c].start;
+        // set dir-vector
+        dir = edges[i0 - 1].dir;
+        for (j = 0; j < dirVLen; j++)
+            dirV[j] = dir;
+        // loop over contour edge points
+        while (edges[i0 - 1].s > 0)
+        {
+            // next contour point
+            i0 = edges[i0 - 1].s;
+            // contour end ?
+            if (i0 == conts[c].end)
+                break;
+        }
+    }
+}
 
 /**
  * Performs edge-thinning via non-local maxima suppression
@@ -180,21 +212,22 @@ void cvtLinkEdges(
     float dr, dq, a1, a2;
     uint32_t x, y, xp, yp, c, pid;
     uint32_t di, dj, predecessor, cnt = 0;
-    
+
     for (i = 0; i < nofEdges; i++)
     {
         // look for a start point
-        if (edges[i].mag >= thHigh && edges[i].s == 0)
+        // if (edges[i].mag >= thHigh && edges[i].s == 0)
+        if (edges[i].s == 0)
         {
             a1 = edges[i].dir; // [0 ... 360]
             di = (uint32_t)floorf(a1 / 45.0f);
             di = di % 8;
             x = edges[i].xi;
             y = edges[i].yi;
-            predecessor = i+1;
+            predecessor = i + 1;
 
             // look for neighbors
-            for (j = 0; j < 3; j++)
+            for (j = 0; j < 4; j++)
             {
                 dj = (uint32_t)_dlink[di][j];
                 xp = x + ((uint32_t)_lx[dj]);
@@ -210,7 +243,7 @@ void cvtLinkEdges(
                         dq = fminf(dq, 360.0 - dq);
                         if (dq < 45.)
                         {
-                            edges[predecessor-1].s = (pid + 1);
+                            edges[predecessor - 1].s = (pid + 1);
                             edges[pid].p = predecessor;
                             break;
                         }
@@ -226,12 +259,14 @@ void cvtLinkEdges(
  */
 void cvtLinkContours(
     std::vector<edg_float> &edges,
-    std::vector<contour> &conts
-)
+    std::vector<contour> &conts,
+    float th)
 {
 
-    uint32_t i, i0, i1, nofEdges = edges.size();
-    uint32_t cnt = 0;
+    uint32_t i, j, i0, i1, nofEdges = edges.size();
+    uint32_t cnt = 0, nofConts;
+    int xi1, yi1, xj0, yj0;
+    float mag;
 
     conts.resize(nofEdges);
     std::fill(conts.begin(), conts.end(), contour{0, 0, 0});
@@ -244,27 +279,117 @@ void cvtLinkContours(
             // look for a start point
             while (edges[i0].p > 0)
             {
-                i0 = edges[i0].p-1;
-                if(i0 == i) break;
+                i0 = edges[i0].p - 1;
+                if (i0 == i)
+                    break;
             }
 
-            conts[cnt].start = (i0+1);
-            edges[i0].c = (cnt+1);
+            conts[cnt].start = (i0 + 1);
+            edges[i0].c = (cnt + 1);
             i1 = i0;
-            conts[cnt].end = (i1+1);
+            conts[cnt].end = (i1 + 1);
             conts[cnt].nofEdges = 1;
+            mag = edges[i0].mag;
             while (edges[i1].s > 0)
             {
-                i1 = edges[i1].s-1;
-                edges[i1].c = (cnt+1);
-                conts[cnt].end = (i1+1);
+                i1 = edges[i1].s - 1;
+                edges[i1].c = (cnt + 1);
+                conts[cnt].end = (i1 + 1);
                 conts[cnt].nofEdges++;
-                if(i1 == i0) break;
+                mag += edges[i1].mag;
+                if (i1 == i0)
+                    break;
             }
-            cnt++;
+            if (conts[cnt].nofEdges > 2)
+            {
+                mag /= (float)(conts[cnt].nofEdges);
+                if (mag > th)
+                    cnt++;
+            }
         }
     }
     conts.resize(cnt);
+
+    // contours divided?
+    nofConts = cnt;
+    cnt = 0;
+    for (i = 0; i < conts.size(); i++)
+    {
+        if (conts[i].start != conts[i].end)
+        {
+            // 1
+            xi1 = (int)edges[conts[i].end - 1].xi;
+            yi1 = (int)edges[conts[i].end - 1].yi;
+            for (j = i + 1; j < conts.size(); j++)
+            {
+                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
+                {
+                    xj0 = (int)edges[conts[j].start - 1].xi;
+                    yj0 = (int)edges[conts[j].start - 1].yi;
+                    if (abs(xi1 - xj0) <= 1 && abs(yi1 - yj0) <= 1)
+                    {
+                        // change contour i
+                        edges[conts[i].end - 1].s = conts[j].start;
+                        edges[conts[j].start - 1].p = conts[i].end;
+                        i0 = conts[i].end;
+                        while(edges[i0-1].s > 0){
+                            i0 = edges[i0-1].s;
+                            edges[i0-1].c = (i+1);
+                            if(i0 == conts[i].start) break;
+                        }
+                        /*
+                        */
+                        conts[i].end = conts[j].end;
+                        conts[i].nofEdges += conts[j].nofEdges;
+                        conts[j].start = 0;
+                        conts[j].end = 0;
+                        conts[j].nofEdges = 0;
+                        cnt++;
+                        break;
+                    }
+                }
+            }
+            // 2
+            xi1 = (int)edges[conts[i].start - 1].xi;
+            yi1 = (int)edges[conts[i].start - 1].yi;
+            for (j = i + 1; j < conts.size(); j++)
+            {
+                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
+                {
+                    xj0 = (int)edges[conts[j].end - 1].xi;
+                    yj0 = (int)edges[conts[j].end - 1].yi;
+                    if (abs(xi1 - xj0) <= 1 && abs(yi1 - yj0) <= 1)
+                    {
+                         // change contour i
+                        edges[conts[i].start - 1].p = conts[j].end;
+                        edges[conts[j].end - 1].s = conts[i].start;
+                        i0 = conts[i].start;
+                        while(edges[i0-1].p > 0){
+                            i0 = edges[i0-1].p;
+                            edges[i0-1].c = (i+1);
+                            if( i0 == conts[i].end) break;
+                        }
+                        /*
+                        */
+                        conts[i].start = conts[j].start;
+                        conts[i].nofEdges += conts[j].nofEdges;
+                        conts[j].start = 0;
+                        conts[j].end = 0;
+                        conts[j].nofEdges = 0;
+                        cnt++;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    for (i = 0; i < conts.size(); i++){
+        if(conts[i].nofEdges==0) conts.erase(conts.begin()+i);
+    }
+
+    cnt = conts.size();
+
 }
 
 void cvtEdgHistogram(
@@ -284,7 +409,6 @@ void cvtEdgHistogram(
         hist[(uint8_t)val]++;
     }
 }
-
 
 /**
  *

@@ -98,7 +98,7 @@ Napi::Value process(const Napi::CallbackInfo &info)
     cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgL_float, gradThLow, gradThHigh, rows, cols);
     returnStr += "nofedges: " + std::to_string(imgLevels[0].edgL_float.size());
     cvtLinkEdges(imgLevels[0].edgL_float, imgLevels[0].gradI_float, gradThLow, gradThHigh, rows, cols );
-    cvtLinkContours(imgLevels[0].edgL_float, imgLevels[0].contoursL); 
+    cvtLinkContours(imgLevels[0].edgL_float, imgLevels[0].contoursL, gradThLow + 0.5*(gradThHigh-gradThLow)); 
     returnStr += ", nofconts: " + std::to_string(imgLevels[0].contoursL.size());
     //cvtEdges2Contours(imgLevels[0].edgL_float);
     //cvtEdgHistogram(imgLevels[0].edgL_float, imgLevels[0].histEdges);
@@ -176,53 +176,6 @@ Napi::Value getEdgeData(const Napi::CallbackInfo& info) {
     return result;
 }
 
-/**
- *  Returning a std::vector<uint_32> as a JavaScript Array
- */
-Napi::Array getGradient(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    uint32_t x,y,c0,c,cid;
-    float m,d;
-
-    // Create a new JS Array with pre-allocated length
-    Napi::Array jsArray = Napi::Array::New(env, (363));
-
-    // check input 'info' structure
-    if (info.Length() != 2 )
-    {
-        Napi::TypeError::New(env, "expected: (x0, y0)")
-            .ThrowAsJavaScriptException();
-        return jsArray;
-    }
-    // extract single arguments from 'info' structure
-    uint32_t x0 = info[0].As<Napi::Number>().Uint32Value();
-    uint32_t y0 = info[1].As<Napi::Number>().Uint32Value();
-        
-   
-
-#if 1
-    for(y=0; y< 11; y++){
-        c0 = (y+y0-5)*cols;
-        for(x=0; x<11; x++){
-            c = c0+(x+x0-5);
-            if(c>=0 && c <size){
-                m = imgLevels[0].gradI_float[c].mag;
-                d = imgLevels[0].gradI_float[c].dir;
-                cid = imgLevels[0].gradI_float[c].edg;
-                if(cid == 0){
-                    m = 0.;
-                    d = 0.;
-                }
-                jsArray.Set((y*(33))+(3*x), Napi::Number::New(env, m));
-                jsArray.Set((y*(33))+(3*x+1), Napi::Number::New(env, d));
-                jsArray.Set((y*(33))+(3*x+2), Napi::Number::New(env, cid));
-            }
-        }
-    }
-#endif
-
-    return jsArray;
-}
 
 /**
  *
@@ -341,7 +294,6 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
     exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, process));
     exports.Set("getEdgeData", Napi::Function::New(env, getEdgeData));
     exports.Set("getHistEdges", Napi::Function::New(env, getHistEdges));
-    exports.Set("getGradient", Napi::Function::New(env, getGradient));
     exports.Set(Napi::String::New(env, "show"), Napi::Function::New(env, show));
     return exports;
 }

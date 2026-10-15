@@ -22,6 +22,7 @@ let moc = new mouseOnCanvas(
   cv, 
   document.getElementById('magnifier'),
   document.getElementById('gradientInfo'),
+  document.getElementById('histograms'),
   imgDisp
 );
 
@@ -160,12 +161,16 @@ window.electronAPI.onInfo((msg) => {
   }
   if (msg.hasOwnProperty("edgeData")) {
     console.log("edgeData");
+    imgDisp.edgeData = msg.edgeData;
     switch(imgDisp.config.edgeMode){
+      case 2:
+        imgDisp.directions();
+        break;
       case 1:
-        imgDisp.contours(msg.edgeData);
+        imgDisp.contours();
         break;
       default:
-        imgDisp.edges(msg.edgeData);
+        imgDisp.edges();
         break;
     }
   }
@@ -191,10 +196,4 @@ cv.addEventListener('loadFromRoot', (e) => {
   window.electronAPI.loadFromRoot(msg);
 });
 //
-cv.addEventListener('requestGradientInfo', (e) => {
-  console.log('requestGradientInfo', e.detail.msg);
-  let msg = e.detail.msg;
-  msg.meaning = "requestGradientInfo";
-  window.electronAPI.loadFromRoot(msg);
-});
 

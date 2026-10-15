@@ -1,3 +1,9 @@
+const toHex = (component) => {
+    // Clamp to [0, 255], round to nearest integer, and convert to 2-digit hex
+    const clamped = Math.max(0, Math.min(255, Math.round(component)));
+    return clamped.toString(16).padStart(2, '0');
+  };
+
 /**
  *
  * @emits imgDispError Customevent 
@@ -61,8 +67,7 @@ class imgdisp {
      * 
      * @param {*} edgPts 
      */
-    contours(edgeData) {
-        this.edgeData = edgeData;
+    contours() {
         const ctx = this.cv.getContext('2d');
         let radius = 1.5;
         // 
@@ -70,12 +75,11 @@ class imgdisp {
         let strokeStyle = ctx.strokeStyle;
         //
         // no of contours
-        let edges = edgeData.edges;
-        let conts = edgeData.conts;
+        let edges = this.edgeData.edges;
+        let conts = this.edgeData.conts;
         let cnt = 0, pt;
         for( let c=0; c<conts.length; c++){
             if (conts[c].nofEdges > 1) {
-                console.log(conts[c]);
                 //console.log(edges[pt-1]);
                 radius = 1.5;
                 /* */
@@ -130,46 +134,51 @@ class imgdisp {
      * 
      * @param {*} edgPts 
      */
-    edges(edgeData) {
-        this.edgeData = edgeData;
+    edges() {
         const ctx = this.cv.getContext('2d');
-        let radius = 1.0;
+        let radius = 1.5;
         // 
         let fillStyle = ctx.fillStyle;
         let strokeStyle = ctx.strokeStyle;
         //
         // line
-        ctx.strokeStyle = "#0000FF"
-        ctx.beginPath();
-        let edgPts = this.edgeData.edges;
-        for (let i = 0; i < edgPts.length; i++) {
-            if (edgPts[i].s > 0) {
-                ctx.moveTo(edgPts[i].xi, edgPts[i].yi);
-                ctx.lineTo(edgPts[edgPts[i].s-1].xi, edgPts[edgPts[i].s-1].yi);
+        ctx.strokeStyle = "#0000FF";
+        let edges = this.edgeData.edges;
+        let conts = this.edgeData.conts;
+        let i, i0, i1;
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+                ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
+        
+                while( edges[i0-1].s > 0){
+                    i0 = edges[i0-1].s;
+                    ctx.lineTo(edges[i0-1].xi, edges[i0-1].yi);
+                    if( i1 === i0 ) break;
+                }
             }
         }
         ctx.stroke();
         //
-        //
-        radius = 1.5;
-        // start points
         ctx.fillStyle = "#00FF00"
-        ctx.beginPath();
-        for (let i = 0; i < edgPts.length; i++) {
-            if (edgPts[i].p == 0 && edgPts[i].s > 0) {
-                ctx.moveTo(edgPts[i].xi + radius, edgPts[i].yi);
-                ctx.arc(edgPts[i].xi, edgPts[i].yi, radius, 0, Math.PI * 2);
+        ctx.beginPath();     
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
+                ctx.arc(edges[i0-1].xi, edges[i0-1].yi, radius, 0, Math.PI * 2);
             }
         }
         ctx.fill();
-        //
-        // end points
+
         ctx.fillStyle = "#FF0000"
-        ctx.beginPath();
-        for (let i = 0; i < edgPts.length; i++) {
-            if (edgPts[i].p > 0 && edgPts[i].s == 0) {
-                ctx.moveTo(edgPts[i].xi + radius, edgPts[i].yi);
-                ctx.arc(edgPts[i].xi, edgPts[i].yi, radius, 0, Math.PI * 2);
+        ctx.beginPath();     
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].end;
+                ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
+                ctx.arc(edges[i0-1].xi, edges[i0-1].yi, radius, 0, Math.PI * 2);
             }
         }
         ctx.fill();
@@ -178,6 +187,84 @@ class imgdisp {
         ctx.strokeStyle = strokeStyle;
     }
 
+    directions() {
+        const ctx = this.cv.getContext('2d');
+        const imgdata = this.imgD.data.slice();
+        let rows = this.rows;
+        let cols = this.cols;
+        let id;
+
+        // 
+        let xi, yi, r, g, b;
+        let h, sector, f, q, t;
+        //
+        let edges = this.edgeData.edges;
+        let conts = this.edgeData.conts;
+        let i, i0, i1;
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+        
+                while (edges[i0 - 1].s > 0) {
+                    xi = edges[i0 - 1].xi;
+                    yi = edges[i0 - 1].yi;
+                    id = yi * (4 * cols) + (4 * xi);
+
+                    h = edges[i0-1].dir / 60.;
+                    sector = Math.floor(h);
+                    f = h - sector; // Fractional part
+
+                    q = Math.round((1.0 - f) * 255.0);
+                    t = Math.round(f * 255.0);
+
+                    switch (sector) {
+                        case 0: // Red to Yellow (0° - 60°)
+                            r = 255;
+                            g = t;
+                            b = 0;
+                            break;
+                        case 1: // Yellow to Green (60° - 120°)
+                            r = q;
+                            g = 255;
+                            b = 0;
+                            break;
+                        case 2: // Green to Cyan (120° - 180°)
+                            r = 0;
+                            g = 255;
+                            b = t;
+                            break;
+                        case 3: // Cyan to Blue (180° - 240°)
+                            r = 0;
+                            g = q;
+                            b = 255;
+                            break;
+                        case 4: // Blue to Magenta (240° - 300°)
+                            r = t;
+                            g = 0;
+                            b = 255;
+                            break;
+                        default: // Magenta to Red (300° - 360°)
+                            r = 255;
+                            g = 0;
+                            b = q;
+                            break;
+                    }
+
+                    imgdata[id] = r;
+                    imgdata[id + 1] = g;
+                    imgdata[id + 2] = b;
+
+                    i0 = edges[i0 - 1].s;
+                    if (i1 === i0) break;
+                }
+            }
+        }
+
+        let imgD = new ImageData(imgdata, cols, rows);
+        ctx.putImageData(imgD, 0, 0);
+
+    }
     /**
      * 
      * @param {string} err error message 

@@ -42,7 +42,7 @@ struct imgLevel
     std::vector<uint32_t> histEdges;
 };
 
-
+void cvtCurvatureContours(std::vector<edg_float> &edges, std::vector<contour> &conts);
 void cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edg_float> &edges, float thLow, float thHigh, uint32_t rows, uint32_t cols);
 void cvtEdgHistogram(std::vector<edg_float> &edges, std::vector<uint32_t> &hist);
 void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size);
@@ -53,7 +53,7 @@ float cvtGrad(std::vector<float> &inI32F, std::vector<grad_float> &gradI32F, std
 void cvtInitGMask32F(float sigma, std::vector<float> &gmask32F, uint32_t size);
 void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t cols, uint32_t nofLevels);
 void cvtLinkEdges(std::vector<edg_float> &edges, std::vector<grad_float> &gradI, float thLow, float thHigh, uint32_t rows, uint32_t cols);
-void cvtLinkContours(std::vector<edg_float> &edges, std::vector<contour> &conts);
+void cvtLinkContours(std::vector<edg_float> &edges, std::vector<contour> &conts, float th);
 void cvtMag2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size);
 void cvtMag2floatI(std::vector<grad_float> &gradI32F, std::vector<float> &out, uint32_t size);
 void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size);

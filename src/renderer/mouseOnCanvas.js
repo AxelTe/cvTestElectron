@@ -5,12 +5,16 @@ class mouseOnCanvas {
     #container = undefined;
     #cvin = undefined;
     #cvout = undefined;
+    #histCV = undefined;
+    #chart = undefined;
     #magCtx = undefined;
     #zoomLevel = 5.0;
     #magSize = 150.0;
     #sourceSize = this.#magSize / this.#zoomLevel;
     #contourBtn = undefined;
     #magnifierBtn = undefined;
+    #gradDirBtns = [];
+    #gradDirFields = [];
     #handleMouseMove = null;
     #backBtn = undefined;
     #gradBtn = undefined;
@@ -19,32 +23,35 @@ class mouseOnCanvas {
     #mouseY = 0;
 
 
-    constructor(container, cvin, cvout, gradInfo, imgDisp) {
+    constructor(container, cvin, cvout, gradInfo, histogram, imgDisp) {
         // canvas object
         this.#container = container;
         this.#cvin = cvin;
         this.#cvout = cvout;
         this.#magCtx = this.#cvout.getContext('2d');
         this.#gradInfoEl = gradInfo;
+        this.#histCV = histogram;
         this.imgDisp = imgDisp;
 
         this.#container.addEventListener('mouseleave', () => {
             this.#cvout.style.display = 'none';
         });
 
-
         this.#container.addEventListener('contextmenu', (event) => this.onContextMenu(this, event));
     }
 
+
     displayGradientInfo(data, x0, y0) {
+        const rect = this.#cvin.getBoundingClientRect();
+        this.#gradInfoEl.style.top = rect.top+"px";
+        this.#gradInfoEl.style.left = rect.x+"px";
         this.#gradInfoEl.style.display = "inline";
-        this.#gradInfoEl.style.top = this.#mouseY + "px";
-        this.#gradInfoEl.style.left = this.#mouseX + "px";
+        //this.#gradInfoEl.style.top = this.#mouseY + "px";
+        //this.#gradInfoEl.style.left = this.#mouseX + "px";
 
-        let nofTabs = 3;
-        let nofR = Math.round(Math.sqrt(data.length / nofTabs));
-        let elt, elc, r, c;
-
+        let elt, elc, bd = 10, r, c, x, y;
+        let fieldNames = ["id", "x", "y", "mag", "dir", "c", "s", "p"]
+        let edges = this.imgDisp.edgeData.edges;
         //
         while (this.#gradInfoEl.firstChild) {
             this.#gradInfoEl.removeChild(this.#gradInfoEl.lastChild);
@@ -52,36 +59,88 @@ class mouseOnCanvas {
 
         elt = this.#gradInfoEl.appendChild(document.createElement('div'));
         elt.classList.add("grad-grid-table");
+        elt.style.gridTemplateColumns = "repeat(" + (2 * bd + 2) + ", 1fr)";
 
-        for (r = 0; r < nofR; r++) {
-            for (c = 0; c < nofR; c++) {
+        // top row
+        elc = elt.appendChild(document.createElement('div'));
+        elc.classList.add("grad-cell");
+        elc.classList.add("grad-cell-up");
+        elc.innerText = "dir";
+        for (c = (1 - bd); c < bd; c++) {
+            x = x0 + c;
+            elc = elt.appendChild(document.createElement('div'));
+            elc.classList.add("grad-cell");
+            elc.classList.add("grad-cell-up");
+            elc.innerText = x;
+        }
+        elc = elt.appendChild(document.createElement('div'));
+        elc.classList.add("grad-cell");
+        elc.classList.add("grad-cell-up");
+        elc.innerText = "";
+        elc = elt.appendChild(document.createElement('div'));
+        elc.classList.add("grad-cell");
+        elc.classList.add("grad-cell-up");
+        elc.innerText = "edgPt";
+
+        for (r = (1 - bd); r < bd; r++) {
+            y = y0 + r;
+            elc = elt.appendChild(document.createElement('div'));
+            elc.classList.add("grad-cell");
+            elc.classList.add("grad-cell-up");
+            elc.innerText = y;
+        
+            for (c = (1 - bd); c < bd; c++) {
+                x = x0 + c;
                 elc = elt.appendChild(document.createElement('div'));
                 elc.classList.add("grad-cell");
-                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c)].toFixed(1);
+                if( r === 0 && c === 0 ) elc.classList.add("grad-cell-up");
+                const edgPt = edges.find(edgPt => edgPt.xi === x && edgPt.yi === y);
+                if (edgPt === undefined) { elc.innerText = "0"; }
+                else {
+                    elc.id = x+","+y;
+                    elc.innerText = edgPt.dir.toFixed(1);
+                    elc.addEventListener("click", (event) => this.onGradDirCell(this, event) );
+                    this.#gradDirBtns.push(elc);
+                }
             }
+            elc = elt.appendChild(document.createElement('div'));
+            elc.classList.add("grad-cell");
+            elc.classList.add("grad-cell-up");
+            if( r+bd-1 < 8) elc.innerText = fieldNames[r+bd-1];
             //
             elc = elt.appendChild(document.createElement('div'));
             elc.classList.add("grad-cell");
+            elc.innerText = "tbd";
+            this.#gradDirFields.push(elc);
+
             //
-            for (c = 0; c < nofR; c++) {
-                elc = elt.appendChild(document.createElement('div'));
-                elc.classList.add("grad-cell");
-                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c + 1)].toFixed(1);
-            }
-            //
-            elc = elt.appendChild(document.createElement('div'));
-            elc.classList.add("grad-cell");
-            //
-            for (c = 0; c < nofR; c++) {
-                elc = elt.appendChild(document.createElement('div'));
-                elc.classList.add("grad-cell");
-                elc.innerText = data[r * (nofTabs * nofR) + (nofTabs * c + 2)].toFixed(1);
-            }
         }
 
         console.log(data.length);
     }
 
+    onGradDirCell(self, ev){
+        console.log("onGradDirCell", ev.target.id)
+        let td = ev.target.id.split(",");
+        if(td.length !== 2) return;
+        let x = parseInt(td[0]);
+        let y = parseInt(td[1]);
+        let edges = self.imgDisp.edgeData.edges;
+        const edgPt = edges.find(edgPt => edgPt.xi === x && edgPt.yi === y);
+        const id = edges.findIndex(edgPt => edgPt.xi === x && edgPt.yi === y);
+        if (edgPt === undefined) return;
+        this.#gradDirFields[0].innerText = id+1;
+        this.#gradDirFields[1].innerText = edgPt.xi;
+        this.#gradDirFields[2].innerText = edgPt.yi;
+        this.#gradDirFields[3].innerText = edgPt.mag.toFixed(1);
+        this.#gradDirFields[4].innerText = edgPt.dir.toFixed(1);
+        this.#gradDirFields[5].innerText = edgPt.c;
+        this.#gradDirFields[6].innerText = edgPt.s;
+        this.#gradDirFields[7].innerText = edgPt.p;
+        //console.log( edgPt );
+                
+                
+    }
     /**
      * 
      * @param {*} self 
@@ -90,6 +149,7 @@ class mouseOnCanvas {
     onContextMenu(self, e) {
         //
         this.#gradInfoEl.style.display = "none";
+        this.#histCV.style.display = 'none';
         // Mausposition relativ zum Canvas berechnen
         const rect = self.#container.getBoundingClientRect();
         self.#mouseX = e.clientX - rect.left;
@@ -103,8 +163,14 @@ class mouseOnCanvas {
         this.#container.removeEventListener('mousemove', this.#handleMouseMove);
         this.#handleMouseMove = null;
         //
+        for(let i=0; i<this.#gradDirBtns.length; i++){
+            this.#gradDirBtns[i].removeEventListener("click", this.onGradDirCell);
+        }
+        this.#gradDirBtns = [];
+        this.#gradDirFields = [];
+        //
         self.#contourBtn = el.appendChild(document.createElement('button'));
-        self.#contourBtn.innerText = "contours";
+        self.#contourBtn.innerText = "edges - contours - direction";
         self.#contourBtn.addEventListener("click", (event) => self.onContourBtn(self, event));
         //
         self.#magnifierBtn = el.appendChild(document.createElement('button'));
@@ -115,15 +181,31 @@ class mouseOnCanvas {
         self.#gradBtn.innerText = "gradient";
         self.#gradBtn.addEventListener("click", (event) => self.onGradBtn(self.#mouseX, self.#mouseY, self, event));
         //
+        self.#contourBtn = el.appendChild(document.createElement('button'));
+        self.#contourBtn.innerText = "dir-histogram";
+        self.#contourBtn.addEventListener("click", (event) => self.onDirHistBtn(self, event));
+        //
         self.#backBtn = el.appendChild(document.createElement('button'));
         self.#backBtn.innerText = "back";
         self.#backBtn.addEventListener("click", (event) => self.offContextMenu(self, event));
-
     }
 
     onContourBtn(self, event) {
         console.log("onContourBtn");
         self.#handleMouseMove = (event) => this.onMouseMove(this, event);
+
+        self.imgDisp.config.edgeMode = (self.imgDisp.config.edgeMode + 1) % 3;
+        switch (self.imgDisp.config.edgeMode) {
+            case 2:
+                self.imgDisp.directions();
+                break;
+            case 1:
+                self.imgDisp.contours();
+                break;
+            default:
+                self.imgDisp.edges();
+                break;
+        }
         //this.#container.addEventListener('mousemove', self.#handleMouseMove);
         this.offContextMenu(self, event);
     }
@@ -138,15 +220,80 @@ class mouseOnCanvas {
 
     onGradBtn(x, y, self, event) {
         console.log("onGradBtn");
-        let x0 = x * (self.#cvin.width / self.#cvin.clientWidth);
-        let y0 = y * (self.#cvin.height / self.#cvin.clientHeight);
-        let requestGradientInfoEvent = new CustomEvent('requestGradientInfo', {
-            bubbles: true,
-            detail: { msg: { x0: x0, y0: y0 } }
-        });
-        self.#cvin.dispatchEvent(requestGradientInfoEvent);
+        let x0 = Math.round(x * (self.#cvin.width / self.#cvin.clientWidth));
+        let y0 = Math.round(y * (self.#cvin.height / self.#cvin.clientHeight));
+        self.displayGradientInfo(self.imgDisp.edgeData, x0, y0);
         this.offContextMenu(self, event);
     }
+
+    onDirHistBtn(self, event) {
+        console.log("onDirHistBtn");
+        //
+        let edges = self.imgDisp.edgeData.edges;
+        let conts = self.imgDisp.edgeData.conts;
+        let i, i0, i1, dir, cnt=0;
+        let hist = new Array(360);
+        let labels = new Array(360);
+        //
+        hist.fill(0);
+        for (i = 0; i < 360; i++) labels[i] = i;
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+                dir = Math.floor(edges[i0-1].dir);
+                hist[dir]++;
+                while( edges[i0-1].s > 0){
+                    i0 = edges[i0-1].s;
+                    dir = Math.floor(edges[i0-1].dir);
+                    hist[dir]++;
+                    if( i1 === i0 ) break;
+                }
+            }
+        }
+        cnt = 0;
+        for (i = 0; i < 360; i++) cnt += hist[i];
+        if(cnt>0) for (i = 0; i < 360; i++) hist[i] = hist[i]/cnt;
+        
+        //
+        const rect = this.#cvin.getBoundingClientRect();
+        this.#histCV.style.top = rect.top+"px";
+        let xoff = (rect.width - this.#histCV.width)/2;
+        xoff = xoff > 0 ? xoff : 0;
+        this.#histCV.style.left = (rect.x + xoff)+"px";
+        this.#histCV.style.display = 'block';
+
+        let datasets = [
+            {
+                data: hist,
+                fill: '1',
+                backgroundColor: 'rgba(0,149,237, 0.2)',
+                borderColor: 'rgb(0,160,237, 0.3)',
+                pointBackgroundColor: 'rgba(0,149,237, 0.0)',
+                pointBorderColor: 'rgba(0,149,237, 0.0)',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(255, 99, 132)'
+            }
+        ]
+        let data = { labels: labels, datasets: datasets };
+
+        let chartConfig = {
+            type: 'line',
+            data: data,
+            options: {  plugins: {  legend: {  display: false  } },
+                        elements: { line: { borderWidth: 3 } },
+                        responsive: false,
+                        maintainAspectRatio: false,
+            }
+        };
+        if(self.#chart !== undefined){
+            self.#chart.destroy();
+        }
+        self.#chart = new Chart(self.#histCV.getContext("2d"), chartConfig);
+        //
+        this.offContextMenu(self, event);
+    }
+
 
     offContextMenu(self, e) {
         console.log("offContextMenu");
@@ -178,8 +325,8 @@ class mouseOnCanvas {
             self.#cvout.style.top = `${e.clientY - self.#magSize / 2}px`;
 
             // Quellbereich berechnen, der in der Lupe angezeigt werden soll
-            let sourceX = (parseFloat(mouseX *self.#cvin.width) / parseFloat(self.#cvin.clientWidth)) - (0.5*self.#sourceSize);
-            let sourceY = (parseFloat(mouseY *self.#cvin.height) / parseFloat(self.#cvin.clientHeight)) - (0.5*self.#sourceSize);
+            let sourceX = (parseFloat(mouseX * self.#cvin.width) / parseFloat(self.#cvin.clientWidth)) - (0.5 * self.#sourceSize);
+            let sourceY = (parseFloat(mouseY * self.#cvin.height) / parseFloat(self.#cvin.clientHeight)) - (0.5 * self.#sourceSize);
 
             // console.log("---")
             //console.log(self.#cvin.width, self.#cvin.height, self.#cvin.clientWidth, self.#cvin.clientHeight)
@@ -191,7 +338,7 @@ class mouseOnCanvas {
             self.#magCtx.drawImage(bitmap, 0, 0, self.#magSize, self.#magSize);
             //
             if (self.imgDisp.edgeData !== null) {
-                let xf,yf;
+                let xf, yf;
                 let radius = 1.0;
                 let fillStyle = self.#magCtx.fillStyle;
                 let strokeStyle = self.#magCtx.strokeStyle;
@@ -201,16 +348,16 @@ class mouseOnCanvas {
                 self.#magCtx.strokeStyle = "#0000FF"
                 self.#magCtx.beginPath();
                 for (let i = 0; i < edges.length; i++) {
-                    if(edges[i].s > 0 ){
+                    if (edges[i].s > 0) {
                         xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
                         yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
-                        let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
-                        if(distance<self.#magSize){
+                        let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
+                        if (distance < self.#magSize) {
                             xf = (xf * self.#zoomLevel);
                             yf = (yf * self.#zoomLevel);
                             self.#magCtx.moveTo((xf), (yf));
-                            xf = edges[edges[i].s-1].xi - sourceX + 1.5; // constant 1.5 ???
-                            yf = edges[edges[i].s-1].yi - sourceY + 1.5; // constant 1.5 ???
+                            xf = edges[edges[i].s - 1].xi - sourceX + 1.5; // constant 1.5 ???
+                            yf = edges[edges[i].s - 1].yi - sourceY + 1.5; // constant 1.5 ???
                             xf = (xf * self.#zoomLevel);
                             yf = (yf * self.#zoomLevel);
                             self.#magCtx.lineTo((xf), (yf));
@@ -240,11 +387,11 @@ class mouseOnCanvas {
                 self.#magCtx.fillStyle = "#00FF00"
                 self.#magCtx.beginPath();
                 for (let i = 0; i < edges.length; i++) {
-                    if(edges[i].p == 0 && edges[i].s>0){
+                    if (edges[i].p == 0 && edges[i].s > 0) {
                         xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
                         yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
-                        let distance = Math.sqrt(Math.pow(xf,2)+Math.pow(yf,2));
-                        if(distance<self.#magSize){
+                        let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
+                        if (distance < self.#magSize) {
                             xf = (xf * self.#zoomLevel);
                             yf = (yf * self.#zoomLevel);
                             self.#magCtx.moveTo((xf), (yf));

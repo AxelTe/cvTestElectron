@@ -176,10 +176,6 @@ ipcMain.on('loadFromRoot', (event, data) => {
       case "loadFromRoot":
         imgseq.loadImg(data.id, data.rows, data.cols);
         break;
-      case "requestGradientInfo":
-        //console.log("requestGradientInfo", data);
-        imgseq.loadGradientInfo(data.x0, data.y0);
-        break;
     }
   }
   

@@ -69,7 +69,6 @@ video {
 
  .grad-grid-table {
   display: grid;
-  grid-template-columns: repeat(35, 1fr); 
   width: 100%;
 }
 
@@ -82,6 +81,12 @@ video {
   border: 1px solid #ccc; /* Nur zur besseren Sichtbarkeit */
   padding: 2px;
   font-size: 4pt;
+}
+
+.grad-cell-up {
+  /* Sorgt dafür, dass überlaufender Text (z.B. lange Nummern/Wörter) die Spalte nicht verzerrt */
+  background-color: var(--color3);
+  color:var(--color4);
 }
 
 .tableCol {
@@ -213,6 +218,16 @@ video {
     position: absolute;
     border: 3px solid #ffffff;
     border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    /* Verhindert Flimmern beim Bewegen der Maus */
+    display: none;
+    z-index: 10;
+}
+
+#histograms {
+    position: absolute;
+    border: 3px solid #ffffff;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     pointer-events: none;
     /* Verhindert Flimmern beim Bewegen der Maus */

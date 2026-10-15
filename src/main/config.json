@@ -8,6 +8,6 @@
     "last": 1
   },
   "imagePyramids": 1,
-  "gradThLow": 5,
+  "gradThLow": 2,
   "gradThHigh": 10
 }
