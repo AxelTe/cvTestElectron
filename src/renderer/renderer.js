@@ -163,11 +163,14 @@ window.electronAPI.onInfo((msg) => {
     console.log("edgeData");
     imgDisp.edgeData = msg.edgeData;
     switch(imgDisp.config.edgeMode){
+      case 3: 
+        imgDisp.lines();
+        break;
       case 2:
         imgDisp.directions();
         break;
       case 1:
-        imgDisp.contours();
+        imgDisp.curvature();
         break;
       default:
         imgDisp.edges();

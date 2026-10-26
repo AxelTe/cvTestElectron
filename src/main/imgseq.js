@@ -31,6 +31,7 @@ class imgseq extends EventEmitter {
         this.nofLevels = 0;
         this.gradThLow = 0.0;
         this.gradThHigh = 0.0;
+        this.curvBd = 10;
         this.id = -1;
     }
 
@@ -38,30 +39,11 @@ class imgseq extends EventEmitter {
         console.log("imgseq.getEdgeData>");
         try {
             const result = myAddon.getEdgeData();
-            console.log("imgseq.getEdgeData> myAddon.getEdgeData() returned:", result.length);
+            console.log("imgseq.getEdgeData> myAddon.getEdgeData() returned:");
             // send processing time to renderer
             this.emit("imgseqInfo", { edgeData: result });
         } catch (error) {
             console.log("imgseq.getEdgeData> Error: ", error);
-            return
-        }
-    }
-
-
-    getHistEdges(){
-        console.log("imgseq.getHistEdges>");
-        try {
-            const result = myAddon.getHistEdges();
-            console.log("imgseq.getHistEdges> myAddon.getHistEdges() returned:", result.length);
-            //console.log(result);
-            for(let i=0; i<30; i++){
-                process.stdout.write(result[i].toString());
-                process.stdout.write(", ");
-            }
-            // send processing time to renderer
-            //this.emit("imgseqInfo", { histEdges: result });
-        } catch (error) {
-            console.log("imgseq.getHistEdges> Error: ", error);
             return
         }
     }
@@ -75,7 +57,7 @@ class imgseq extends EventEmitter {
      * @param {number} config.imgArrLen "size of internal image array"
      * @returns {void}
      */
-    start(config, nofLevels, gradThLow, gradThHigh) {
+    start(config, nofLevels, gradThLow, gradThHigh, curvBd) {
         let valid = true;
         if (config.hasOwnProperty("path")) this.path = config.path;
         else valid = false;
@@ -90,6 +72,7 @@ class imgseq extends EventEmitter {
         this.nofLevels = nofLevels;
         this.gradThHigh = gradThHigh;
         this.gradThLow = gradThLow;
+        this.curvBd = curvBd;
 
         let fname = this.path + "\\" + this.seqname;
         console.log("imgseq.start:", fname);
@@ -111,8 +94,8 @@ class imgseq extends EventEmitter {
             //@@@ console.log("imgseq.start: ", this.seqinfo);
 
             try {
-                console.log("myAddon.initialize", this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh)
-                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh);
+                console.log("myAddon.initialize", this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd)
+                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd);
                 console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
 
             } catch (error) {

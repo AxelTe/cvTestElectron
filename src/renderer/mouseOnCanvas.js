@@ -45,12 +45,12 @@ class mouseOnCanvas {
         const rect = this.#cvin.getBoundingClientRect();
         this.#gradInfoEl.style.top = rect.top+"px";
         this.#gradInfoEl.style.left = rect.x+"px";
-        this.#gradInfoEl.style.display = "inline";
+        this.#gradInfoEl.style.display = "block";
         //this.#gradInfoEl.style.top = this.#mouseY + "px";
         //this.#gradInfoEl.style.left = this.#mouseX + "px";
 
         let elt, elc, bd = 10, r, c, x, y;
-        let fieldNames = ["id", "x", "y", "mag", "dir", "c", "s", "p"]
+        let fieldNames = ["id", "x", "y", "mag", "dir", "c", "s", "p","n3x3", "curv"];
         let edges = this.imgDisp.edgeData.edges;
         //
         while (this.#gradInfoEl.firstChild) {
@@ -106,7 +106,7 @@ class mouseOnCanvas {
             elc = elt.appendChild(document.createElement('div'));
             elc.classList.add("grad-cell");
             elc.classList.add("grad-cell-up");
-            if( r+bd-1 < 8) elc.innerText = fieldNames[r+bd-1];
+            if( r+bd-1 < 10) elc.innerText = fieldNames[r+bd-1];
             //
             elc = elt.appendChild(document.createElement('div'));
             elc.classList.add("grad-cell");
@@ -137,6 +137,8 @@ class mouseOnCanvas {
         this.#gradDirFields[5].innerText = edgPt.c;
         this.#gradDirFields[6].innerText = edgPt.s;
         this.#gradDirFields[7].innerText = edgPt.p;
+        this.#gradDirFields[8].innerText = edgPt.n3x3;
+        this.#gradDirFields[9].innerText = edgPt.curv.toFixed(2);
         //console.log( edgPt );
                 
                 
@@ -185,6 +187,11 @@ class mouseOnCanvas {
         self.#contourBtn.innerText = "dir-histogram";
         self.#contourBtn.addEventListener("click", (event) => self.onDirHistBtn(self, event));
         //
+        self.#contourBtn = el.appendChild(document.createElement('button'));
+        self.#contourBtn.innerText = "edge-histogram";
+        //self.#contourBtn.addEventListener("click", (event) => self.onEdgeHistBtn(self, event));
+        self.#contourBtn.addEventListener("click", (event) => self.onCurvHistBtn(self, event));
+        //
         self.#backBtn = el.appendChild(document.createElement('button'));
         self.#backBtn.innerText = "back";
         self.#backBtn.addEventListener("click", (event) => self.offContextMenu(self, event));
@@ -194,13 +201,16 @@ class mouseOnCanvas {
         console.log("onContourBtn");
         self.#handleMouseMove = (event) => this.onMouseMove(this, event);
 
-        self.imgDisp.config.edgeMode = (self.imgDisp.config.edgeMode + 1) % 3;
+        self.imgDisp.config.edgeMode = (self.imgDisp.config.edgeMode + 1) % 4;
         switch (self.imgDisp.config.edgeMode) {
+            case 3:
+                self.imgDisp.lines();
+                break;
             case 2:
                 self.imgDisp.directions();
                 break;
             case 1:
-                self.imgDisp.contours();
+                self.imgDisp.curvature();
                 break;
             default:
                 self.imgDisp.edges();
@@ -223,6 +233,76 @@ class mouseOnCanvas {
         let x0 = Math.round(x * (self.#cvin.width / self.#cvin.clientWidth));
         let y0 = Math.round(y * (self.#cvin.height / self.#cvin.clientHeight));
         self.displayGradientInfo(self.imgDisp.edgeData, x0, y0);
+        this.offContextMenu(self, event);
+    }
+
+    onCurvHistBtn(self, event) {
+        console.log("onCurvHistBtn");
+        //
+        let edges = self.imgDisp.edgeData.edges;
+        let conts = self.imgDisp.edgeData.conts;
+        let i, i0, i1, curv, cnt=0;
+        let hist = new Array(1000);
+        let labels = new Array(1000);
+        //
+        hist.fill(0);
+        for (i = 0; i < 1000; i++) labels[i] = 1*i/1000;
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+                curv = Math.floor(1000*edges[i0-1].curv);
+                curv = curv >= 1000 ? 999 : curv;
+                hist[curv]++;
+                while( edges[i0-1].s > 0){
+                    i0 = edges[i0-1].s;
+                     curv = Math.floor(1000*edges[i0-1].curv);
+                    curv = curv >= 1000 ? 999 : curv;
+                    hist[curv]++;
+                    if( i1 === i0 ) break;
+                }
+            }
+        }
+        cnt = 0;
+        for (i = 0; i < 1000; i++) cnt += hist[i];
+        if(cnt>0) for (i = 0; i < 1000; i++) hist[i] = hist[i]/cnt;
+        
+        //
+        const rect = this.#cvin.getBoundingClientRect();
+        this.#histCV.style.top = rect.top+"px";
+        let xoff = (rect.width - this.#histCV.width)/2;
+        xoff = xoff > 0 ? xoff : 0;
+        this.#histCV.style.left = (rect.x + xoff)+"px";
+        this.#histCV.style.display = 'block';
+
+        let datasets = [
+            {
+                data: hist,
+                fill: '1',
+                backgroundColor: 'rgba(0,149,237, 0.2)',
+                borderColor: 'rgb(0,160,237, 0.3)',
+                pointBackgroundColor: 'rgba(0,149,237, 0.0)',
+                pointBorderColor: 'rgba(0,149,237, 0.0)',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(255, 99, 132)'
+            }
+        ]
+        let data = { labels: labels, datasets: datasets };
+
+        let chartConfig = {
+            type: 'line',
+            data: data,
+            options: {  plugins: {  legend: {  display: false  } },
+                        elements: { line: { borderWidth: 3 } },
+                        responsive: false,
+                        maintainAspectRatio: false,
+            }
+        };
+        if(self.#chart !== undefined){
+            self.#chart.destroy();
+        }
+        self.#chart = new Chart(self.#histCV.getContext("2d"), chartConfig);
+        //
         this.offContextMenu(self, event);
     }
 
@@ -255,6 +335,58 @@ class mouseOnCanvas {
         for (i = 0; i < 360; i++) cnt += hist[i];
         if(cnt>0) for (i = 0; i < 360; i++) hist[i] = hist[i]/cnt;
         
+        //
+        const rect = this.#cvin.getBoundingClientRect();
+        this.#histCV.style.top = rect.top+"px";
+        let xoff = (rect.width - this.#histCV.width)/2;
+        xoff = xoff > 0 ? xoff : 0;
+        this.#histCV.style.left = (rect.x + xoff)+"px";
+        this.#histCV.style.display = 'block';
+
+        let datasets = [
+            {
+                data: hist,
+                fill: '1',
+                backgroundColor: 'rgba(0,149,237, 0.2)',
+                borderColor: 'rgb(0,160,237, 0.3)',
+                pointBackgroundColor: 'rgba(0,149,237, 0.0)',
+                pointBorderColor: 'rgba(0,149,237, 0.0)',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(255, 99, 132)'
+            }
+        ]
+        let data = { labels: labels, datasets: datasets };
+
+        let chartConfig = {
+            type: 'line',
+            data: data,
+            options: {  plugins: {  legend: {  display: false  } },
+                        elements: { line: { borderWidth: 3 } },
+                        responsive: false,
+                        maintainAspectRatio: false,
+            }
+        };
+        if(self.#chart !== undefined){
+            self.#chart.destroy();
+        }
+        self.#chart = new Chart(self.#histCV.getContext("2d"), chartConfig);
+        //
+        this.offContextMenu(self, event);
+    }
+
+    /**
+     * 
+     * @param {*} self 
+     * @param {*} event 
+     */
+    onEdgeHistBtn(self, event) {
+        console.log("onDirHistBtn");
+        //
+        let i, i0, i1, dir, cnt=0;
+        let hist = self.imgDisp.edgeData.edgHist;
+        let labels = new Array(hist.length);
+        //
+        for (i = 0; i < labels.length; i++) labels[i] = i;
         //
         const rect = this.#cvin.getBoundingClientRect();
         this.#histCV.style.top = rect.top+"px";
@@ -349,15 +481,15 @@ class mouseOnCanvas {
                 self.#magCtx.beginPath();
                 for (let i = 0; i < edges.length; i++) {
                     if (edges[i].s > 0) {
-                        xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
-                        yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        xf = edges[i].xf - sourceX + 1.5; // constant 1.5 ???
+                        yf = edges[i].yf - sourceY + 1.5; // constant 1.5 ???
+                        xf = (xf * self.#zoomLevel);
+                        yf = (yf * self.#zoomLevel);
                         let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
                         if (distance < self.#magSize) {
-                            xf = (xf * self.#zoomLevel);
-                            yf = (yf * self.#zoomLevel);
                             self.#magCtx.moveTo((xf), (yf));
-                            xf = edges[edges[i].s - 1].xi - sourceX + 1.5; // constant 1.5 ???
-                            yf = edges[edges[i].s - 1].yi - sourceY + 1.5; // constant 1.5 ???
+                            xf = edges[edges[i].s - 1].xf - sourceX + 1.5; // constant 1.5 ???
+                            yf = edges[edges[i].s - 1].yf - sourceY + 1.5; // constant 1.5 ???
                             xf = (xf * self.#zoomLevel);
                             yf = (yf * self.#zoomLevel);
                             self.#magCtx.lineTo((xf), (yf));
@@ -365,6 +497,28 @@ class mouseOnCanvas {
                     }
                 }
                 self.#magCtx.stroke();
+
+                //
+                radius = 1.0;
+                for (let i = 0; i < edges.length; i++) {
+                    if (edges[i].s > 0) {
+                        xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
+                        yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        xf = (xf * self.#zoomLevel);
+                        yf = (yf * self.#zoomLevel);
+                        let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
+                        if (distance < self.#magSize) {
+                            let val = parseInt(100.0*edges[i].curv);
+                            val = val > 255 ? 255 : val;
+                            self.#magCtx.beginPath();
+                            self.#magCtx.fillStyle = "#"+toHex(val)+toHex(255-val)+"00";
+                            self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
+                            self.#magCtx.fill();
+                        }
+                    }
+                }
+                //
+
                 //
                 radius = 1.5;
                 self.#magCtx.fillStyle = "#FF0000"
@@ -373,10 +527,10 @@ class mouseOnCanvas {
                     if (edges[i].s == 0 && edges[i].p > 0) {
                         xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
                         yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        xf = (xf * self.#zoomLevel);
+                        yf = (yf * self.#zoomLevel);
                         let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
                         if (distance < self.#magSize) {
-                            xf = (xf * self.#zoomLevel);
-                            yf = (yf * self.#zoomLevel);
                             self.#magCtx.moveTo((xf), (yf));
                             self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
                         }
@@ -390,10 +544,10 @@ class mouseOnCanvas {
                     if (edges[i].p == 0 && edges[i].s > 0) {
                         xf = edges[i].xi - sourceX + 1.5; // constant 1.5 ???
                         yf = edges[i].yi - sourceY + 1.5; // constant 1.5 ???
+                        xf = (xf * self.#zoomLevel);
+                        yf = (yf * self.#zoomLevel);
                         let distance = Math.sqrt(Math.pow(xf, 2) + Math.pow(yf, 2));
                         if (distance < self.#magSize) {
-                            xf = (xf * self.#zoomLevel);
-                            yf = (yf * self.#zoomLevel);
                             self.#magCtx.moveTo((xf), (yf));
                             self.#magCtx.arc((xf), (yf), radius, 0, Math.PI * 2);
                         }

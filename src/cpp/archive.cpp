@@ -1,7 +1,7 @@
-void cvtEdgLinkHistogram(std::vector<grad_float> &gradI,std::vector<edg_float> &edges, std::vector<uint32_t> &hist, uint32_t rows, uint32_t cols);
-void cvtLinkEdges(std::vector<edg_float> &edges, std::vector<grad_float> &gradI, uint32_t rows, uint32_t cols);
-void cvtLinkPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff);
-void cvtEdges2Contours(std::vector<edg_float> &edges);
+void cvtEdgLinkHistogram(std::vector<grad_float> &gradI,std::vector<edge> &edges, std::vector<uint32_t> &hist, uint32_t rows, uint32_t cols);
+void cvtLinkEdges(std::vector<edge> &edges, std::vector<grad_float> &gradI, uint32_t rows, uint32_t cols);
+void cvtLinkPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff);
+void cvtEdges2Contours(std::vector<edge> &edges);
 
 
 
@@ -10,7 +10,7 @@ void cvtEdges2Contours(std::vector<edg_float> &edges);
  */
 void cvtEdgLinkHistogram(
     std::vector<grad_float> &gradI,
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     std::vector<uint32_t> &hist,
     uint32_t rows, 
     uint32_t cols)
@@ -42,7 +42,7 @@ void cvtEdgLinkHistogram(
  *
  */
 void cvtLinkEdges(
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     std::vector<grad_float> &gradI,
     uint32_t rows,
     uint32_t cols)
@@ -124,7 +124,7 @@ void cvtLinkEdges(
 /**
  *
  */
-void cvtLinkPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
+void cvtLinkPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
 {
     float dir, h, f;
     int sector;
@@ -176,7 +176,7 @@ void cvtLinkPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t r
 /**
  *
  */
-void cvtEdges2Contours(std::vector<edg_float> &edges)
+void cvtEdges2Contours(std::vector<edge> &edges)
 {
 
     uint32_t i, j;

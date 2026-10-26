@@ -1,13 +1,14 @@
 {
   "imgDisp": {
-    "edgeMode": 1
+    "edgeMode": 3
   },
   "imgseq": {
-    "path": "C:\\Users\\axelt.FUTURESHAPE\\Desktop\\projects\\sequences\\video_2",
-    "seqname": "video_2.json",
+    "path": "C:\\Users\\axelt.FUTURESHAPE\\Desktop\\projects\\sequences\\EckenMuster",
+    "seqname": "EckenMuster.json",
     "last": 1
   },
   "imagePyramids": 1,
   "gradThLow": 2,
-  "gradThHigh": 10
+  "gradThHigh": 10,
+  "curvBd": 20
 }

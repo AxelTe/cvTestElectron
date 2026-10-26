@@ -29,7 +29,7 @@ const createWindow = () => {
   mainWin.webContents.on('did-finish-load', () => {
     console.log("main browser window ready");
     sendInfoToMainGUI({"dispConfig": config.imgDisp});
-    imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh);
+    imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh, config.curvBd);
   });
 
   mainWin.on("close", () => {
@@ -122,7 +122,7 @@ ipcMain.handle('dialog:openFile', async () => {
       }
       config.imgseq.path = tstr;
       config.imgseq.seqname = tstr1[tstr1.length - 1];
-      imgseq.start(config.imgseq, config.imagePyramids);
+      imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh, config.curvBd);
       try {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
       } catch (error) {
@@ -193,7 +193,6 @@ imgseq.on("imgseqInfo", function (msg) {
   if (msg.hasOwnProperty("loadTime")) {
     sendInfoToMainGUI(msg);
     imgseq.processImg();
-    imgseq.getHistEdges();
   }
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);

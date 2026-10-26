@@ -24,38 +24,258 @@ static const int8_t _py[8] = {1, 1, 0, -1, -1, -1, 0, 1};
 static const int8_t _sx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
 static const int8_t _sy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
 
+static const int8_t _n3x3[256] = {
+    0, 1, 1, 1, 1, 2, 1, 0,
+    1, 2, 2, 2, 1, 2, 0, 0,
+    1, 2, 2, 2, 2, 3, 2, 0,
+    1, 2, 2, 2, 0, 0, 0, 0,
+    1, 2, 2, 2, 2, 3, 2, 0,
+    2, 3, 3, 3, 2, 3, 0, 0,
+    1, 2, 2, 2, 2, 3, 2, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 2, 2, 2, 2, 3, 2, 0,
+    2, 3, 3, 3, 2, 3, 0, 0,
+    2, 3, 3, 3, 3, 4, 3, 0,
+    2, 3, 3, 3, 0, 0, 0, 0,
+    1, 2, 2, 2, 2, 3, 2, 0,
+    2, 3, 3, 3, 2, 3, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 2, 0, 2, 2, 2, 0,
+    2, 2, 3, 0, 2, 2, 0, 0,
+    2, 2, 3, 0, 3, 3, 3, 0,
+    2, 2, 3, 0, 0, 0, 0, 0,
+    2, 2, 3, 0, 3, 3, 3, 0,
+    3, 3, 4, 0, 3, 3, 0, 0,
+    2, 2, 3, 0, 3, 3, 3, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 0, 2, 0, 2, 0, 2, 0,
+    2, 0, 3, 0, 2, 0, 0, 0,
+    2, 0, 3, 0, 3, 0, 3, 0,
+    2, 0, 3, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0};
+
 static float _sqrt2 = sqrtf(2.0);
 static float degree2rad = ((float)std::numbers::pi) / 180.;
 static float rad2degree = 1. / degree2rad;
 
-void cvtCurvatureContours(
-    std::vector<edg_float> &edges,
-    std::vector<contour> &conts)
-{
-    uint32_t c, i0, j;
-    uint32_t dirVLen = 10;
-    float dir;
-    std::vector<float> dirV;
+static std::vector<float> gmaskCurv;
 
-    dirV.resize(dirVLen, 0);
+void cvtCurvatureContours(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts,
+    uint32_t curvBd)
+{
+    int cnt, c, i, isize, bd, bsize;
+    float dx, dy, norm;
+    std::vector<edge>::iterator edg0, pt0, pt1, ptc;
+    std::vector<contour>::iterator cont;
+
+    edg0 = edges.begin();
 
     // loop over contours
-    for (c = 0; c < conts.size(); c++)
+    for (cont = conts.begin(); cont != conts.end(); cont++)
     {
-        // contour start point
-        i0 = conts[c].start;
-        // set dir-vector
-        dir = edges[i0 - 1].dir;
-        for (j = 0; j < dirVLen; j++)
-            dirV[j] = dir;
-        // loop over contour edge points
-        while (edges[i0 - 1].s > 0)
+
+        bd = curvBd;
+        bsize = 2 * curvBd + 1;
+        if (cont->nofEdges < bsize)
         {
-            // next contour point
-            i0 = edges[i0 - 1].s;
-            // contour end ?
-            if (i0 == conts[c].end)
-                break;
+            bd = (int)(cont->nofEdges > 1);
+            bsize = 2 * bd + 1;
+        }
+        // closed ?
+        if (cont->start == cont->end)
+        {
+             // closed contour
+            // start point
+            pt0 = edg0 + (cont->start - 1);
+            for (i = bd; i >= 0; i--)
+            {
+                if (pt0->p > 0)
+                    pt0 = edg0 + (pt0->p - 1);
+            }
+            // end point
+            pt1 = edg0 + (cont->start - 1);
+            for (i = bd; i >= 0; i--)
+            {
+                if (pt1->s > 0)
+                    pt1 = edg0 + (pt1->s - 1);
+            }
+            // center point
+            ptc = edg0 + (cont->start - 1);
+            //
+            cnt = cont->nofEdges;
+        }
+        else
+        {
+            // open contour
+            /// start point
+            pt0 = edg0 + (cont->start - 1);
+            // end point
+            pt1 = edg0 + (cont->start - 1);
+            for (i = bsize; i > 0; i--)
+            {
+                if (pt1->s > 0)
+                    pt1 = edg0 + (pt1->s - 1);
+            }
+            // center point
+            ptc = edg0 + (cont->start - 1);
+            for (i = bd; i > 0; i--)
+            {
+                if (ptc->s > 0)
+                    ptc = edg0 + (ptc->s - 1);
+            }
+            //
+            cnt = cont->nofEdges - (2 * bd);
+        }
+        //
+        // calculate curvature
+        for (i = 0; i < cnt; i++)
+        {
+            if (pt1 != ptc && pt0 != ptc)
+            {
+                dx = pt1->xf - pt0->xf;
+                dy = pt1->yf - pt0->yf;
+                norm = sqrtf(powf(dx, 2) + powf(dy, 2));
+                if (norm > 0.0001)
+                {
+                    ptc->curv = fabsf((dx * (pt0->yf - ptc->yf)) - (dy * (pt0->xf - ptc->xf))) / norm;
+                }
+            }
+            if (pt0->s > 0)
+                pt0 = edg0 + (pt0->s - 1);
+            if (pt1->s > 0)
+                pt1 = edg0 + (pt1->s - 1);
+            if (ptc->s > 0)
+                ptc = edg0 + (ptc->s - 1);
+        }
+    }
+}
+
+void cvtCurvatureContours2(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts,
+    uint32_t curvBd)
+{
+    int cnt, c, i, isize, bd = curvBd, bsize = 2 * bd + 1;
+    float dx, dy, norm;
+    std::vector<edge>::iterator edg0, pt0, pt1, ptc;
+    std::vector<contour>::iterator cont;
+
+    edg0 = edges.begin();
+
+    // loop over contours
+    for (cont = conts.begin(); cont != conts.end(); cont++)
+    {
+
+        if (cont->nofEdges >= bsize)
+        {
+            // closed ?
+            if (cont->start == cont->end)
+            {
+                // start point
+                pt0 = edg0 + (cont->start - 1);
+                for (i = bd; i >= 0; i--)
+                {
+                    if (pt0->p > 0)
+                        pt0 = edg0 + (pt0->p - 1);
+                }
+                // end point
+                pt1 = edg0 + (cont->start - 1);
+                for (i = bd; i >= 0; i--)
+                {
+                    if (pt1->s > 0)
+                        pt1 = edg0 + (pt1->s - 1);
+                }
+                // center point
+                ptc = edg0 + (cont->start - 1);
+                //
+                cnt = cont->nofEdges;
+            }
+            else
+            {
+                // start point
+                pt0 = edg0 + (cont->start - 1);
+                // end point
+                pt1 = edg0 + (cont->start - 1);
+                for (i = bsize; i > 0; i--)
+                {
+                    if (pt1->s > 0)
+                        pt1 = edg0 + (pt1->s - 1);
+                }
+                // center point
+                ptc = edg0 + (cont->start - 1);
+                for (i = bd; i > 0; i--)
+                {
+                    if (ptc->s > 0)
+                        ptc = edg0 + (ptc->s - 1);
+                }
+                //
+                cnt = cont->nofEdges - (2 * bd);
+            }
+            //
+            // calculate curvature
+            for (i = 0; i < cnt; i++)
+            {
+                if (pt1 != ptc && pt0 != ptc)
+                {
+                    dx = pt1->xf - pt0->xf;
+                    dy = pt1->yf - pt0->yf;
+                    norm = sqrtf(powf(dx, 2) + powf(dy, 2));
+                    if (norm > 0.0001)
+                    {
+                        ptc->curv = fabsf((dx * (pt0->yf - ptc->yf)) - (dy * (pt0->xf - ptc->xf))) / norm;
+                    }
+                }
+                if (pt0->s > 0)
+                    pt0 = edg0 + (pt0->s - 1);
+                if (pt1->s > 0)
+                    pt1 = edg0 + (pt1->s - 1);
+                if (ptc->s > 0)
+                    ptc = edg0 + (ptc->s - 1);
+            }
+        }
+        else
+        {
+            // closed ?
+            if (cont->start == cont->end)
+            {
+                // straight line between start and a middle point on the contour
+                pt0 = edg0 + (cont->start - 1);
+                pt1 = edg0 + (cont->start - 1);
+                isize = cont->nofEdges / 2;
+                for (i = isize; i >= 0; i--)
+                {
+                    if (pt1->s > 0)
+                        pt1 = edg0 + (pt1->s - 1);
+                }
+            }
+            else
+            {
+                // straight line between start and end
+                pt0 = edg0 + (cont->start - 1);
+                pt1 = edg0 + (cont->end - 1);
+            }
+            //
+            // calculate curvatures
+            dx = pt1->xf - pt0->xf;
+            dy = pt1->yf - pt0->yf;
+            norm = sqrtf(powf(dx, 2) + powf(dy, 2));
+            if (norm > 0.0001)
+            {
+                ptc = edg0 + (cont->start - 1);
+                isize = cont->nofEdges;
+                for (i = isize; i >= 0; i--)
+                {
+                    ptc->curv = fabsf(dx * (pt0->yf - ptc->yf) - dy * (pt0->xf - ptc->xf)) / norm;
+                    if (ptc->s > 0)
+                        ptc = edg0 + (ptc->s - 1);
+                }
+            }
         }
     }
 }
@@ -75,7 +295,7 @@ void cvtCurvatureContours(
 
 void cvtEdgDetection(
     std::vector<grad_float> &gradI,
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     float thLow,
     float thHigh,
     uint32_t rows,
@@ -83,7 +303,7 @@ void cvtEdgDetection(
 {
     float aF, mF, mF1, mF2, xf, yf;
     float dxf, dyf;
-    uint32_t nofEdges, cnt = 0;
+    uint32_t cnt = 0, val;
     uint32_t i, j, c, c0, c1, size;
     uint32_t u, v;
 
@@ -146,7 +366,7 @@ void cvtEdgDetection(
     //
     // edge list
     edges.resize(cnt);
-    std::fill(edges.begin(), edges.end(), edg_float{0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0});
+    std::fill(edges.begin(), edges.end(), edge{0, 0, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0, 0, 0, 0});
     cnt = 0;
     for (c = c0; c < c1; c++)
     {
@@ -163,44 +383,197 @@ void cvtEdgDetection(
             }
         }
     }
-    nofEdges = cnt;
+}
 
-#if 0
+/**
+ *
+ */
+void cvtEdgFilter3x3(
+    std::vector<grad_float> &gradI,
+    std::vector<edge> &edges,
+    uint32_t rows,
+    uint32_t cols)
+
+{
+    uint32_t j, c, cnt, val;
     //
-    // sub pixel precision
-    for (i = 0; i < nofEdges; i++)
+    // n3x3
+    cnt = 0;
+    for (std::vector<edge>::iterator pt = edges.begin(); pt != edges.end();)
+    {
+        val = 0;
+        for (j = 0; j < 8; j++)
+        {
+            c = (pt->yi + _ly[j]) * cols + (pt->xi + _lx[j]);
+            if (gradI[c].edg > 0)
+                val += (1 << j);
+        }
+        if (_n3x3[val] == 0)
+        {
+            gradI[(pt->yi * cols) + pt->xi].edg = 0;
+            pt = edges.erase(pt);
+        }
+        else
+        {
+            pt->n3x3 = (uint32_t)_n3x3[val];
+            cnt++;
+            gradI[(pt->yi * cols) + pt->xi].edg = cnt;
+            pt++;
+        }
+    }
+}
+
+/**
+ *
+ */
+void cvtEdgSubPixel(
+    std::vector<grad_float> &gradI,
+    std::vector<edge> &edges,
+    uint32_t rows,
+    uint32_t cols)
+
+{
+    int cnt, u, v, j, c;
+    float xf, yf, mF;
+
+    for (std::vector<edge>::iterator pt = edges.begin(); pt != edges.end(); pt++)
     {
         cnt = 1;
-        mF1 = edges[i].mag;
+        mF = pt->mag;
         // dxf = cosf(edges[i].dir * degree2rad);
         // dyf = sinf(edges[i].dir * degree2rad);
-        u = edges[i].xi;
-        v = edges[i].yi;
-        xf = edges[i].mag * ((float)u);
-        yf = edges[i].mag * ((float)v);
+        u = pt->xi;
+        v = pt->yi;
+        xf = mF * ((float)u);
+        yf = mF * ((float)v);
         for (j = 0; j < 8; j++)
         {
             c = (v + _ly[j]) * cols + (u + _lx[j]);
             if (gradI[c].edg > 0)
             {
-                mF1 += gradI[c].mag;
+                mF += gradI[c].mag;
                 xf += gradI[c].mag * ((float)u + _lx[j]);
                 yf += gradI[c].mag * ((float)v + _ly[j]);
                 cnt++;
             }
         }
-        edges[i].xf = xf / mF1;
-        edges[i].yf = yf / mF1;
+        pt->xf = xf / mF;
+        pt->yf = yf / mF;
+    }
+}
+
+/**
+ *
+ */
+void cvtLineDetection(
+    std::vector<edge> &edges,
+    std::vector<contour> &contours,
+    std::vector<line> &lines,
+    uint32_t curvBd)
+{
+
+    std::vector<contour>::iterator cont;
+    std::vector<edge>::iterator ept, tstart, tend;
+    std::vector<line>::iterator lineP;
+    int i, edgCnt, lineCnt;
+    float dx, dy, norm, dis;
+    bool valid;
+
+    //
+    lines.resize(edges.size());
+    std::fill(lines.begin(), lines.end(), line{0, 0, 0, 0});
+    lineP = lines.begin();
+
+    // loop over contours
+    for (cont = contours.begin(); cont != contours.end(); cont++)
+    {
+        if (cont->nofEdges > (2 * curvBd + 1))
+        {
+            edgCnt = 0;
+            ept = edges.begin() + cont->start - 1;
+            for (int i = 0; i < cont->nofEdges; i++)
+            {
+                if (ept->curv >= 0 && ept->curv < 0.9)
+                {
+                    if (edgCnt == 0)
+                    {
+                        tstart = ept;
+                    }
+                    tend = ept;
+                    edgCnt++;
+                }
+                else
+                {
+                    if (edgCnt > 10)
+                    {
+                        lineP->start = std::distance(edges.begin(), tstart) + 1;
+                        lineP->end = std::distance(edges.begin(), tend) + 1;
+                        lineP->cont = std::distance(contours.begin(), cont) + 1;
+                        lineP->nofEdges = edgCnt;
+                        lineP++;
+                    }
+                    edgCnt = 0;
+                }
+                if (ept->s > 0)
+                    ept = edges.begin() + (ept->s - 1);
+                else
+                    break;
+            }
+            if (edgCnt > 10)
+            {
+                lineP->start = std::distance(edges.begin(), tstart) + 1;
+                lineP->end = std::distance(edges.begin(), tend) + 1;
+                lineP->cont = std::distance(contours.begin(), cont) + 1;
+                lineP->nofEdges = edgCnt;
+                lineP++;
+            }
+        }
+    }
+
+    lineCnt = std::distance(lines.begin(), lineP);
+    lines.resize(lineCnt);
+
+#if 1
+    for (lineP = lines.begin(); lineP != lines.end();)
+    {
+        tstart = edges.begin() + (lineP->start - 1);
+        tend = edges.begin() + (lineP->end - 1);
+        dx = tend->xf - tstart->xf;
+        dy = tend->yf - tstart->yf;
+        norm = sqrtf(powf(dx, 2) + powf(dy, 2));
+        valid = true;
+        if (norm > 0.0001)
+        {
+            ept = tstart;
+            for (i = 0; i < lineP->nofEdges; i++)
+            {
+                if (ept->s > 0)
+                    ept = edges.begin() + (ept->s - 1);
+                dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
+                if (dis > 1.0)
+                {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            valid = false;
+        }
+        if (valid)
+            lineP++;
+        else
+            lineP = lines.erase(lineP);
     }
 #endif
-    //
 }
 
 /**
  *
  */
 void cvtLinkEdges(
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     std::vector<grad_float> &gradI,
     float thLow,
     float thHigh,
@@ -238,15 +611,9 @@ void cvtLinkEdges(
                     pid = gradI[c].edg - 1;
                     if (edges[pid].p == 0 && (edges[pid].s - 1) != i)
                     {
-                        a2 = gradI[c].dir; // [0 ... 360]
-                        dq = fmodf(fabs(a1 - a2), 360.);
-                        dq = fminf(dq, 360.0 - dq);
-                        if (dq < 45.)
-                        {
-                            edges[predecessor - 1].s = (pid + 1);
-                            edges[pid].p = predecessor;
-                            break;
-                        }
+                        edges[predecessor - 1].s = (pid + 1);
+                        edges[pid].p = predecessor;
+                        break;
                     }
                 }
             }
@@ -258,7 +625,7 @@ void cvtLinkEdges(
  *
  */
 void cvtLinkContours(
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     std::vector<contour> &conts,
     float th)
 {
@@ -309,36 +676,48 @@ void cvtLinkContours(
         }
     }
     conts.resize(cnt);
+}
+
+/**
+ *
+ */
+void cvtContoursCombine(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts)
+{
+    uint32_t cnt, i, j, i0;
+    int xi, yi, xj, yj;
 
     // contours divided?
-    nofConts = cnt;
     cnt = 0;
     for (i = 0; i < conts.size(); i++)
     {
         if (conts[i].start != conts[i].end)
         {
             // 1
-            xi1 = (int)edges[conts[i].end - 1].xi;
-            yi1 = (int)edges[conts[i].end - 1].yi;
+            xi = (int)edges[conts[i].end - 1].xi;
+            yi = (int)edges[conts[i].end - 1].yi;
             for (j = i + 1; j < conts.size(); j++)
             {
                 if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
                 {
-                    xj0 = (int)edges[conts[j].start - 1].xi;
-                    yj0 = (int)edges[conts[j].start - 1].yi;
-                    if (abs(xi1 - xj0) <= 1 && abs(yi1 - yj0) <= 1)
+                    xj = (int)edges[conts[j].start - 1].xi;
+                    yj = (int)edges[conts[j].start - 1].yi;
+                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
                     {
                         // change contour i
                         edges[conts[i].end - 1].s = conts[j].start;
                         edges[conts[j].start - 1].p = conts[i].end;
                         i0 = conts[i].end;
-                        while(edges[i0-1].s > 0){
-                            i0 = edges[i0-1].s;
-                            edges[i0-1].c = (i+1);
-                            if(i0 == conts[i].start) break;
+                        while (edges[i0 - 1].s > 0)
+                        {
+                            i0 = edges[i0 - 1].s;
+                            edges[i0 - 1].c = (i + 1);
+                            if (i0 == conts[i].start)
+                                break;
                         }
                         /*
-                        */
+                         */
                         conts[i].end = conts[j].end;
                         conts[i].nofEdges += conts[j].nofEdges;
                         conts[j].start = 0;
@@ -350,27 +729,29 @@ void cvtLinkContours(
                 }
             }
             // 2
-            xi1 = (int)edges[conts[i].start - 1].xi;
-            yi1 = (int)edges[conts[i].start - 1].yi;
+            xi = (int)edges[conts[i].start - 1].xi;
+            yi = (int)edges[conts[i].start - 1].yi;
             for (j = i + 1; j < conts.size(); j++)
             {
                 if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
                 {
-                    xj0 = (int)edges[conts[j].end - 1].xi;
-                    yj0 = (int)edges[conts[j].end - 1].yi;
-                    if (abs(xi1 - xj0) <= 1 && abs(yi1 - yj0) <= 1)
+                    xj = (int)edges[conts[j].end - 1].xi;
+                    yj = (int)edges[conts[j].end - 1].yi;
+                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
                     {
-                         // change contour i
+                        // change contour i
                         edges[conts[i].start - 1].p = conts[j].end;
                         edges[conts[j].end - 1].s = conts[i].start;
                         i0 = conts[i].start;
-                        while(edges[i0-1].p > 0){
-                            i0 = edges[i0-1].p;
-                            edges[i0-1].c = (i+1);
-                            if( i0 == conts[i].end) break;
+                        while (edges[i0 - 1].p > 0)
+                        {
+                            i0 = edges[i0 - 1].p;
+                            edges[i0 - 1].c = (i + 1);
+                            if (i0 == conts[i].end)
+                                break;
                         }
                         /*
-                        */
+                         */
                         conts[i].start = conts[j].start;
                         conts[i].nofEdges += conts[j].nofEdges;
                         conts[j].start = 0;
@@ -384,16 +765,22 @@ void cvtLinkContours(
         }
     }
 
-    for (i = 0; i < conts.size(); i++){
-        if(conts[i].nofEdges==0) conts.erase(conts.begin()+i);
+    std::vector<contour>::iterator cpt = conts.begin();
+    while (cpt != conts.end())
+    {
+        if (cpt->nofEdges == 0)
+        {
+            cpt = conts.erase(cpt);
+        }
+        else
+        {
+            cpt = cpt + 1;
+        }
     }
-
-    cnt = conts.size();
-
 }
 
 void cvtEdgHistogram(
-    std::vector<edg_float> &edges,
+    std::vector<edge> &edges,
     std::vector<uint32_t> &hist)
 {
     uint32_t nofEdges = edges.size();
@@ -407,6 +794,42 @@ void cvtEdgHistogram(
         val = edges[i].mag;
         val = val > 255. ? 255. : val;
         hist[(uint8_t)val]++;
+    }
+}
+
+/**
+ *
+ */
+void cvtEdgLinkHistogram(
+    std::vector<grad_float> &gradI,
+    std::vector<edge> &edges,
+    std::vector<uint32_t> &hist,
+    uint32_t rows,
+    uint32_t cols)
+{
+    uint32_t nofEdges = edges.size();
+    uint32_t xi, yi, i, xj, yj, j;
+    uint8_t val;
+
+    // reset histogram
+    for (uint32_t i = 0; i < 256; i++)
+        hist[i] = 0;
+
+    // loop over edge points
+    for (i = 0; i < nofEdges; i++)
+    {
+        xi = edges[i].xi;
+        yi = edges[i].yi;
+        val = 0;
+        for (j = 0; j < 8; j++)
+        {
+            xj = xi + _lx[j];
+            yj = yi + _ly[j];
+            if (gradI[(yj * cols) + xj].edg > 0)
+                val += (1 << j);
+        }
+        edges[i].n3x3 = val;
+        hist[val]++;
     }
 }
 
@@ -431,7 +854,7 @@ void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t s
 /**
  *
  */
-void cvtEdgPts2RGBA(std::vector<edg_float> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
+void cvtEdgPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
 {
     float dir, h, f;
     int sector;
@@ -703,8 +1126,9 @@ void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t co
         iLevelL[i].greyI_float.resize(size, 0);
         iLevelL[i].gaussI_float.resize(size, 0);
         iLevelL[i].gradI_float.resize(size);
-        iLevelL[i].edgL_float.resize(size);
+        iLevelL[i].edgesL.resize(size);
         iLevelL[i].contoursL.resize(size);
+        iLevelL[i].linesL.resize(size);
         iLevelL[i].histEdges.resize(256);
     }
 }

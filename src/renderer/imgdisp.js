@@ -30,6 +30,7 @@ class imgdisp {
         this.imgD = null;
         this.edgeData = null;
         this.config = null;
+        this.pTimes = null;
 
         const ctx = this.cv.getContext('2d');
         ctx.font = '30px Arial';
@@ -47,19 +48,37 @@ class imgdisp {
         let clampedArr = new Uint8ClampedArray(imgU8Array); //.data);
         this.imgD = new ImageData(clampedArr, cols, rows);
         ctx.putImageData(this.imgD, 0, 0);
+        this.pTimes = pTimes;
 
         //
+        this.#dispProcessTime();
+        /*
         let tstr = "Proc. time: ";
         tstr = tstr + pTimes[0].min + ".." + pTimes[0].val + ".." + pTimes[0].max;
         tstr = tstr + ", " + pTimes[1].min + ".." + pTimes[1].val + ".." + pTimes[1].max;
         tstr = tstr + ", " + (Date.now() - this.#t0);
         ctx.fillText(tstr, 2, this.rows - 2);
+        */
         //
         if ((this.end - this.start) <= this.id) {
             clearInterval(this.dispQueueTimer);
             this.dispQueueTimer = null
         } else {
             this.id++;
+        }
+    }
+
+    #dispProcessTime(){
+        if(this.pTimes !== null){
+            const ctx = this.cv.getContext('2d');
+            let font = ctx.font;
+            ctx.font = "18px Arial";
+            let tstr = "Proc. time: ";
+            tstr = tstr + this.pTimes[0].min + ".." + this.pTimes[0].val + ".." + this.pTimes[0].max;
+            tstr = tstr + ", " + this.pTimes[1].min + ".." + this.pTimes[1].val + ".." + this.pTimes[1].max;
+            tstr = tstr + ", " + (Date.now() - this.#t0);
+            ctx.fillText(tstr, 2, this.rows - 2);
+            ctx.font = font;
         }
     }
 
@@ -136,7 +155,10 @@ class imgdisp {
      */
     edges() {
         const ctx = this.cv.getContext('2d');
-        let radius = 1.5;
+        let radius = 2.0;
+
+        ctx.putImageData(this.imgD, 0, 0);
+
         // 
         let fillStyle = ctx.fillStyle;
         let strokeStyle = ctx.strokeStyle;
@@ -150,21 +172,40 @@ class imgdisp {
             if (conts[i].nofEdges > 1) {
                 i0 = conts[i].start;
                 i1 = conts[i].end;
-                ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
-        
+                ctx.moveTo(edges[i0-1].xf, edges[i0-1].yf);
                 while( edges[i0-1].s > 0){
                     i0 = edges[i0-1].s;
-                    ctx.lineTo(edges[i0-1].xi, edges[i0-1].yi);
+                    ctx.lineTo(edges[i0-1].xf, edges[i0-1].yf);
                     if( i1 === i0 ) break;
                 }
             }
         }
         ctx.stroke();
+
+        //
+        ctx.fillStyle = "#FF00FF"
+        ctx.beginPath();     
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+                while( edges[i0-1].s > 0){
+                    if(edges[i0-1].curv > 1.50){
+                        ctx.moveTo(edges[i0-1].xf, edges[i0-1].yf);
+                        ctx.arc(edges[i0-1].xf, edges[i0-1].yf, radius, 0, Math.PI * 2);
+                    }
+                    i0 = edges[i0-1].s;
+                    if( i1 === i0 ) break;
+                }
+            }
+        }
+        ctx.fill();
+
         //
         ctx.fillStyle = "#00FF00"
         ctx.beginPath();     
         for( i=0; i<conts.length; i++){
-            if (conts[i].nofEdges > 1) {
+            if (conts[i].nofEdges > 1 && conts[i].start != conts[i].end) {
                 i0 = conts[i].start;
                 ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
                 ctx.arc(edges[i0-1].xi, edges[i0-1].yi, radius, 0, Math.PI * 2);
@@ -175,7 +216,20 @@ class imgdisp {
         ctx.fillStyle = "#FF0000"
         ctx.beginPath();     
         for( i=0; i<conts.length; i++){
-            if (conts[i].nofEdges > 1) {
+            if (conts[i].nofEdges > 1 && conts[i].start != conts[i].end) 
+            {
+                i0 = conts[i].end;
+                ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
+                ctx.arc(edges[i0-1].xi, edges[i0-1].yi, radius, 0, Math.PI * 2);
+            }
+        }
+        ctx.fill();
+        
+        ctx.fillStyle = "#FFFF00"
+        ctx.beginPath();     
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1 && conts[i].start == conts[i].end) 
+            {
                 i0 = conts[i].end;
                 ctx.moveTo(edges[i0-1].xi, edges[i0-1].yi);
                 ctx.arc(edges[i0-1].xi, edges[i0-1].yi, radius, 0, Math.PI * 2);
@@ -185,6 +239,65 @@ class imgdisp {
         //
         ctx.fillStyle = fillStyle;
         ctx.strokeStyle = strokeStyle;
+        //
+        this.#dispProcessTime();
+    }
+
+    curvature() {
+        const ctx = this.cv.getContext('2d');
+        const imgdata = this.imgD.data.slice();
+        let rows = this.rows;
+        let cols = this.cols;
+        let id;
+        // 
+        let xi, yi, r, g, b, val;
+        //
+        let edges = this.edgeData.edges;
+        let conts = this.edgeData.conts;
+        let i, i0, i1;
+        for( i=0; i<conts.length; i++){
+            if (conts[i].nofEdges > 1) {
+                i0 = conts[i].start;
+                i1 = conts[i].end;
+        
+                while (edges[i0 - 1].s > 0) {
+                    xi = edges[i0 - 1].xi;
+                    yi = edges[i0 - 1].yi;
+                    id = yi * (4 * cols) + (4 * xi);
+
+                    val = edges[i0 - 1].curv;
+                    if( val < 0) {
+                        r = g = b = 0;
+                    } else {
+                        val = parseInt(20*val) //255*val/360);
+                        val = val > 255 ? 255 : val;
+                        if( val >= 128 ){
+                            r = 255;
+                            g = 255-(2*(val-128));
+                            b = 0x00;
+                        } else {
+                            r = 2 * val;
+                            g = 255; ;
+                            b = 0x00;
+
+                        }
+                        
+                    }
+                    imgdata[id] = r;
+                    imgdata[id + 1] = g;
+                    imgdata[id + 2] = b;
+
+                    i0 = edges[i0 - 1].s;
+                    if (i1 === i0) break;
+                }
+            }
+        }
+
+        let imgD = new ImageData(imgdata, cols, rows);
+        ctx.putImageData(imgD, 0, 0);
+        //
+        this.#dispProcessTime();
+
     }
 
     directions() {
@@ -263,6 +376,66 @@ class imgdisp {
 
         let imgD = new ImageData(imgdata, cols, rows);
         ctx.putImageData(imgD, 0, 0);
+        //
+        this.#dispProcessTime();
+
+    }
+
+    lines() {
+        const ctx = this.cv.getContext('2d');
+        const imgdata = this.imgD.data.slice();
+        let rows = this.rows;
+        let cols = this.cols;
+        let id;
+
+        ctx.putImageData(this.imgD, 0, 0);
+
+        // 
+        let fillStyle = ctx.fillStyle;
+        let strokeStyle = ctx.strokeStyle;
+
+        // 
+        //
+        let edges = this.edgeData.edges;
+        let lines = this.edgeData.lines;
+        let i, i0, i1;
+        let radius = 2.0;
+
+        ctx.strokeStyle = "#0000FF";
+        ctx.beginPath();
+        for( i=0; i<lines.length; i++){
+            i0 = lines[i].start;
+            i1 = lines[i].end;
+            ctx.moveTo( edges[i0-1].xf, edges[i0-1].yf );
+            ctx.lineTo( edges[i1-1].xf, edges[i1-1].yf )        
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = "#00FF00";
+        ctx.beginPath();
+        for( i=0; i<lines.length; i++){
+            i0 = lines[i].start;
+            ctx.moveTo( edges[i0-1].xf, edges[i0-1].yf );
+            ctx.arc(edges[i0-1].xf, edges[i0-1].yf, radius, 0, Math.PI * 2);
+
+        }
+        ctx.fill();
+
+        ctx.fillStyle = "#FF0000";
+        ctx.beginPath();
+        for( i=0; i<lines.length; i++){
+            i0 = lines[i].end;
+            ctx.moveTo( edges[i0-1].xf, edges[i0-1].yf );
+            ctx.arc(edges[i0-1].xf, edges[i0-1].yf, radius, 0, Math.PI * 2);
+
+        }
+        ctx.fill();
+
+        //
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = strokeStyle;
+        //
+        this.#dispProcessTime();
 
     }
     /**
