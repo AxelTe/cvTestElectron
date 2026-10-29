@@ -2,7 +2,41 @@ const toHex = (component) => {
     // Clamp to [0, 255], round to nearest integer, and convert to 2-digit hex
     const clamped = Math.max(0, Math.min(255, Math.round(component)));
     return clamped.toString(16).padStart(2, '0');
-  };
+};
+
+function drawTextWithBackground(ctx, text, x, y, options = {}) {
+  const fontSize = options.fontSize || 24;
+  const fontFamily = options.fontFamily || 'sans-serif';
+  const padding = options.padding || 8;
+  const textColor = options.textColor || '#ffffff';
+  const bgColor = options.bgColor || '#2563eb';
+
+  ctx.save();
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.textBaseline = 'top';
+
+  // 1. Measure the text metrics
+  const metrics = ctx.measureText(text);
+  const textWidth = metrics.width;
+  // Use actual bounding box or font bounding box for height calculation
+  const textHeight = 1.2 *fontSize;
+
+  // 2. Draw the background bounding box
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(
+    x - padding,
+    y - padding,
+    textWidth + padding * 2,
+    textHeight + padding * 2
+  );
+
+  // 3. Draw the text over the background
+  ctx.fillStyle = textColor;
+  ctx.fillText(text, x, y);
+
+  ctx.restore();
+}
+
 
 /**
  *
@@ -71,14 +105,11 @@ class imgdisp {
     #dispProcessTime(){
         if(this.pTimes !== null){
             const ctx = this.cv.getContext('2d');
-            let font = ctx.font;
-            ctx.font = "18px Arial";
-            let tstr = "Proc. time: ";
+            let tstr = "";
             tstr = tstr + this.pTimes[0].min + ".." + this.pTimes[0].val + ".." + this.pTimes[0].max;
             tstr = tstr + ", " + this.pTimes[1].min + ".." + this.pTimes[1].val + ".." + this.pTimes[1].max;
             tstr = tstr + ", " + (Date.now() - this.#t0);
-            ctx.fillText(tstr, 2, this.rows - 2);
-            ctx.font = font;
+            drawTextWithBackground(ctx, tstr, 2, this.rows - 14- 2, {fontSize: 14, bgColor: "lightgrey", textColor: "black"});
         }
     }
 

@@ -148,7 +148,8 @@ window.electronAPI.onInfo((msg) => {
     let rows = msg.rows;
     let cols = msg.cols;
     let channels = msg.channels;
-          
+    el = document.getElementById("footLeft");
+    el.innerText = "rows: "+rows+", cols: "+cols;
     imgDisp.dispImg(img, rows, cols, ptimes);
   }
 

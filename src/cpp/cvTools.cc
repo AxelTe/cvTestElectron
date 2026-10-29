@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include <cstdint>
 #include <vector>
 #include <math.h>
@@ -64,6 +65,9 @@ static float rad2degree = 1. / degree2rad;
 
 static std::vector<float> gmaskCurv;
 
+static processTime pTime;
+std::chrono::time_point<std::chrono::system_clock> _start;
+
 void cvtCurvatureContours(
     std::vector<edge> &edges,
     std::vector<contour> &conts,
@@ -82,7 +86,7 @@ void cvtCurvatureContours(
 
         bd = curvBd;
         bsize = 2 * curvBd + 1;
-        if (cont->nofEdges < bsize)
+        if (cont->nofEdges < (uint32_t) bsize)
         {
             bd = (int)(cont->nofEdges > 1);
             bsize = 2 * bd + 1;
@@ -152,130 +156,6 @@ void cvtCurvatureContours(
                 pt1 = edg0 + (pt1->s - 1);
             if (ptc->s > 0)
                 ptc = edg0 + (ptc->s - 1);
-        }
-    }
-}
-
-void cvtCurvatureContours2(
-    std::vector<edge> &edges,
-    std::vector<contour> &conts,
-    uint32_t curvBd)
-{
-    int cnt, c, i, isize, bd = curvBd, bsize = 2 * bd + 1;
-    float dx, dy, norm;
-    std::vector<edge>::iterator edg0, pt0, pt1, ptc;
-    std::vector<contour>::iterator cont;
-
-    edg0 = edges.begin();
-
-    // loop over contours
-    for (cont = conts.begin(); cont != conts.end(); cont++)
-    {
-
-        if (cont->nofEdges >= bsize)
-        {
-            // closed ?
-            if (cont->start == cont->end)
-            {
-                // start point
-                pt0 = edg0 + (cont->start - 1);
-                for (i = bd; i >= 0; i--)
-                {
-                    if (pt0->p > 0)
-                        pt0 = edg0 + (pt0->p - 1);
-                }
-                // end point
-                pt1 = edg0 + (cont->start - 1);
-                for (i = bd; i >= 0; i--)
-                {
-                    if (pt1->s > 0)
-                        pt1 = edg0 + (pt1->s - 1);
-                }
-                // center point
-                ptc = edg0 + (cont->start - 1);
-                //
-                cnt = cont->nofEdges;
-            }
-            else
-            {
-                // start point
-                pt0 = edg0 + (cont->start - 1);
-                // end point
-                pt1 = edg0 + (cont->start - 1);
-                for (i = bsize; i > 0; i--)
-                {
-                    if (pt1->s > 0)
-                        pt1 = edg0 + (pt1->s - 1);
-                }
-                // center point
-                ptc = edg0 + (cont->start - 1);
-                for (i = bd; i > 0; i--)
-                {
-                    if (ptc->s > 0)
-                        ptc = edg0 + (ptc->s - 1);
-                }
-                //
-                cnt = cont->nofEdges - (2 * bd);
-            }
-            //
-            // calculate curvature
-            for (i = 0; i < cnt; i++)
-            {
-                if (pt1 != ptc && pt0 != ptc)
-                {
-                    dx = pt1->xf - pt0->xf;
-                    dy = pt1->yf - pt0->yf;
-                    norm = sqrtf(powf(dx, 2) + powf(dy, 2));
-                    if (norm > 0.0001)
-                    {
-                        ptc->curv = fabsf((dx * (pt0->yf - ptc->yf)) - (dy * (pt0->xf - ptc->xf))) / norm;
-                    }
-                }
-                if (pt0->s > 0)
-                    pt0 = edg0 + (pt0->s - 1);
-                if (pt1->s > 0)
-                    pt1 = edg0 + (pt1->s - 1);
-                if (ptc->s > 0)
-                    ptc = edg0 + (ptc->s - 1);
-            }
-        }
-        else
-        {
-            // closed ?
-            if (cont->start == cont->end)
-            {
-                // straight line between start and a middle point on the contour
-                pt0 = edg0 + (cont->start - 1);
-                pt1 = edg0 + (cont->start - 1);
-                isize = cont->nofEdges / 2;
-                for (i = isize; i >= 0; i--)
-                {
-                    if (pt1->s > 0)
-                        pt1 = edg0 + (pt1->s - 1);
-                }
-            }
-            else
-            {
-                // straight line between start and end
-                pt0 = edg0 + (cont->start - 1);
-                pt1 = edg0 + (cont->end - 1);
-            }
-            //
-            // calculate curvatures
-            dx = pt1->xf - pt0->xf;
-            dy = pt1->yf - pt0->yf;
-            norm = sqrtf(powf(dx, 2) + powf(dy, 2));
-            if (norm > 0.0001)
-            {
-                ptc = edg0 + (cont->start - 1);
-                isize = cont->nofEdges;
-                for (i = isize; i >= 0; i--)
-                {
-                    ptc->curv = fabsf(dx * (pt0->yf - ptc->yf) - dy * (pt0->xf - ptc->xf)) / norm;
-                    if (ptc->s > 0)
-                        ptc = edg0 + (ptc->s - 1);
-                }
-            }
         }
     }
 }
@@ -534,6 +414,7 @@ void cvtLineDetection(
     lines.resize(lineCnt);
 
 #if 1
+    // prove straight lines
     for (lineP = lines.begin(); lineP != lines.end();)
     {
         tstart = edges.begin() + (lineP->start - 1);
@@ -547,8 +428,7 @@ void cvtLineDetection(
             ept = tstart;
             for (i = 0; i < lineP->nofEdges; i++)
             {
-                if (ept->s > 0)
-                    ept = edges.begin() + (ept->s - 1);
+                if (ept->s > 0) ept = edges.begin() + (ept->s - 1);
                 dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
                 if (dis > 1.0)
                 {
@@ -567,6 +447,51 @@ void cvtLineDetection(
             lineP = lines.erase(lineP);
     }
 #endif
+
+#if 1
+    // expand
+    for (lineP = lines.begin(); lineP != lines.end(); lineP++)
+    {
+        tstart = edges.begin() + (lineP->start - 1);
+        tend = edges.begin() + (lineP->end - 1);
+        dx = tend->xf - tstart->xf;
+        dy = tend->yf - tstart->yf;
+        norm = sqrtf(powf(dx, 2) + powf(dy, 2));
+        if (norm > 0.0001)
+        {
+            // start
+            ept = tstart;
+            edgCnt = 0;
+            while( ept->p > 0){
+                ept = edges.begin() + (ept->p - 1);
+                dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
+                if( dis < 0.4){
+                    tstart = ept;
+                    edgCnt++;
+                } else{
+                    break;
+                }
+            }
+            // end
+            ept = tend;
+            while( ept->s > 0){
+                ept = edges.begin() + (ept->s - 1);
+                dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
+                if( dis < 0.4){
+                    tend = ept;
+                    edgCnt++;
+                } else{
+                    break;
+                }
+            }
+        }
+        lineP->start = std::distance(edges.begin(), tstart) + 1;
+        lineP->end =  std::distance(edges.begin(), tend) + 1;
+        lineP->nofEdges += edgCnt;
+
+    }
+#endif
+
 }
 
 /**
@@ -1102,6 +1027,9 @@ void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
     // pixels[0] = Red, pixels[1] = Green, pixels[2] = Blue, pixels[3] = Alpha
     float r, g, b;
     uint32_t channels = 4;
+
+    cvtTimerStart();
+
     for (uint32_t i = 0, j = 0; i < size; i++)
     {
         r = (float)inRGBA[j];
@@ -1110,6 +1038,8 @@ void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
         j = j + channels;
         greyI32F[i] = 0.2989 * r + 0.5870 * g + 0.1140 * b;
     }
+
+    pTime.cvtRGBA2Grey = cvtTimerEnd(); 
 }
 
 /**
@@ -1118,6 +1048,7 @@ void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
 void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t cols, uint32_t nofLevels)
 {
     uint32_t i, size = rows * cols * 2;
+
     //
     for (i = 0; i < nofLevels; i++)
     {
@@ -1131,6 +1062,8 @@ void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t co
         iLevelL[i].linesL.resize(size);
         iLevelL[i].histEdges.resize(256);
     }
+
+
 }
 
 /**
@@ -1191,4 +1124,20 @@ void cvtCopyI32F2RGBA(
         outRGBA[out_i + 2] = in_v;
         out_i += 4;
     }
+}
+
+/**
+ * 
+ */
+void cvtTimerStart(){
+    _start = std::chrono::system_clock::now();
+}
+
+std::chrono::duration<double> cvtTimerEnd(){
+    std::chrono::time_point<std::chrono::system_clock> end;
+    end  = std::chrono::system_clock::now();
+
+    std::chrono::duration<double, std::milli> duration = end - _start;
+
+    return(duration);
 }

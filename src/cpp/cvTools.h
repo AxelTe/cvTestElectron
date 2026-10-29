@@ -55,6 +55,11 @@ struct imgLevel
     std::vector<uint32_t> histEdges;
 };
 
+struct processTime {
+    std::chrono::duration<double>  cvtRGBA2Grey;
+    std::chrono::duration<double>  cvtGauss5x5;
+};
+
 void cvtCurvatureContours(std::vector<edge> &edges, std::vector<contour> &conts, uint32_t curvBd);
 void cvtContoursCombine(std::vector<edge> &edges, std::vector<contour> &conts);
 void cvtEdgDetection(std::vector<grad_float> &gradI, std::vector<edge> &edges, float thLow, float thHigh, uint32_t rows, uint32_t cols);
@@ -77,4 +82,6 @@ void cvtMag2floatI(std::vector<grad_float> &gradI32F, std::vector<float> &out, u
 void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size);
 void cvtSubSample(std::vector<float> &inI, std::vector<float> &outI, uint32_t rows, uint32_t cols);
 void cvtCopyI32F2RGBA(std::vector<float> &inI, uint32_t irows, uint32_t icols,  uint8_t *outRGBA, uint32_t ox0, uint32_t oy0, uint32_t orwos, uint32_t ocols);
+void cvtTimerStart();
+std::chrono::duration<double> cvtTimerEnd();
 

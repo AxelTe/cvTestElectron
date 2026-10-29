@@ -93,6 +93,7 @@ Napi::Value process(const Napi::CallbackInfo &info)
 
     //
     // start processing ...
+    // start timer
     cvtRGBA2Grey(pixels, imgLevels[0].greyI_float, size);
     cvtGauss5x5(imgLevels[0].greyI_float, imgLevels[0].tmpI_float, imgLevels[0].gaussI_float, gmask32F, rows, cols);
     magMax = cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, imgLevels[0].histEdges, gradThLow, rows, cols);
