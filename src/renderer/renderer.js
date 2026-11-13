@@ -72,7 +72,7 @@ lastBtn.addEventListener('click', async () => {
   }
   imgDisp.id = imgDisp.id-2;
   if(imgDisp.id<0) imgDisp = 0;
-  imgDisp.loadImgFrommRoot();
+  imgDisp.loadImgFrommRoot(run);
 });
 
 nextBtn.addEventListener('click', async () => {
@@ -84,7 +84,7 @@ nextBtn.addEventListener('click', async () => {
     run = 0;
     imgDisp.stopDisplayQueue();
   }
-  imgDisp.loadImgFrommRoot();
+  imgDisp.loadImgFrommRoot(run);
 });
 
 resetBtn.addEventListener('click', async () => {
@@ -97,7 +97,7 @@ resetBtn.addEventListener('click', async () => {
     imgDisp.stopDisplayQueue();
   }
   imgDisp.id = 0;
-  imgDisp.loadImgFrommRoot();
+  imgDisp.loadImgFrommRoot(run);
 });
 //
 //
@@ -119,7 +119,7 @@ window.electronAPI.onInfo((msg) => {
   }
 
   if (msg.hasOwnProperty("loadTime")) {
-    console.log("loadTime");
+    console.log(Date.now(),"loadTime");
     let tt = msg.loadTime;
     ptimes[0].min = ptimes[0].min > tt ? tt : ptimes[0].min;
     ptimes[0].max = ptimes[0].max < tt ? tt : ptimes[0].max;
@@ -127,7 +127,7 @@ window.electronAPI.onInfo((msg) => {
   }
 
   if (msg.hasOwnProperty("processTime")) {
-    console.log("processTime");
+    console.log(Date.now(),"processTime");
     let tt = msg.processTime;
     ptimes[1].min = ptimes[1].min > tt ? tt : ptimes[1].min;
     ptimes[1].max = ptimes[1].max < tt ? tt : ptimes[1].max;
@@ -141,7 +141,7 @@ window.electronAPI.onInfo((msg) => {
   }
 
   if (msg.hasOwnProperty("img")) {
-    console.log("img");
+    console.log(Date.now(), "img");
     let el = document.getElementById("DispBar");
     el.value = imgDisp.id;
     let img = msg.img;
@@ -161,7 +161,7 @@ window.electronAPI.onInfo((msg) => {
     moc.displayGradientInfo(msg.gradientInfo, msg.x0, msg.y0)
   }
   if (msg.hasOwnProperty("edgeData")) {
-    console.log("edgeData");
+    console.log(Date.now(), "edgeData");
     imgDisp.edgeData = msg.edgeData;
     switch(imgDisp.config.edgeMode){
       case 3: 

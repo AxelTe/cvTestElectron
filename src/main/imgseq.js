@@ -40,10 +40,24 @@ class imgseq extends EventEmitter {
         try {
             const result = myAddon.getEdgeData();
             console.log("imgseq.getEdgeData> myAddon.getEdgeData() returned:");
-            // send processing time to renderer
+            // send edgeData to renderer
             this.emit("imgseqInfo", { edgeData: result });
         } catch (error) {
             console.log("imgseq.getEdgeData> Error: ", error);
+            return
+        }
+    }
+
+    getTimerValues(){
+        console.log("imgseq.getTimerValues>");
+        try {
+            const result = myAddon.getTimerValues();
+            console.log("imgseq.getTimerValues> myAddon.getTimerValues() returned:");
+            console.log(result);
+            // send processing time to renderer
+            this.emit("imgseqInfo", { getTimerValues: result });
+        } catch (error) {
+            console.log("imgseq.getTimerValues> Error: ", error);
             return
         }
     }

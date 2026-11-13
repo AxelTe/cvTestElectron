@@ -276,10 +276,7 @@ class imgdisp {
 
     curvature() {
         const ctx = this.cv.getContext('2d');
-        const imgdata = this.imgD.data.slice();
-        let rows = this.rows;
-        let cols = this.cols;
-        let id;
+
         // 
         let xi, yi, r, g, b, val;
         //
@@ -294,7 +291,6 @@ class imgdisp {
                 while (edges[i0 - 1].s > 0) {
                     xi = edges[i0 - 1].xi;
                     yi = edges[i0 - 1].yi;
-                    id = yi * (4 * cols) + (4 * xi);
 
                     val = edges[i0 - 1].curv;
                     if( val < 0) {
@@ -310,22 +306,16 @@ class imgdisp {
                             r = 2 * val;
                             g = 255; ;
                             b = 0x00;
-
-                        }
-                        
+                        }                        
                     }
-                    imgdata[id] = r;
-                    imgdata[id + 1] = g;
-                    imgdata[id + 2] = b;
-
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    ctx.fillRect(xi, yi, 2, 2); // Draws a 1x1 rectangle at (50, 100)
                     i0 = edges[i0 - 1].s;
                     if (i1 === i0) break;
                 }
             }
         }
 
-        let imgD = new ImageData(imgdata, cols, rows);
-        ctx.putImageData(imgD, 0, 0);
         //
         this.#dispProcessTime();
 
@@ -333,10 +323,6 @@ class imgdisp {
 
     directions() {
         const ctx = this.cv.getContext('2d');
-        const imgdata = this.imgD.data.slice();
-        let rows = this.rows;
-        let cols = this.cols;
-        let id;
 
         // 
         let xi, yi, r, g, b;
@@ -353,8 +339,7 @@ class imgdisp {
                 while (edges[i0 - 1].s > 0) {
                     xi = edges[i0 - 1].xi;
                     yi = edges[i0 - 1].yi;
-                    id = yi * (4 * cols) + (4 * xi);
-
+                    
                     h = edges[i0-1].dir / 60.;
                     sector = Math.floor(h);
                     f = h - sector; // Fractional part
@@ -395,9 +380,8 @@ class imgdisp {
                             break;
                     }
 
-                    imgdata[id] = r;
-                    imgdata[id + 1] = g;
-                    imgdata[id + 2] = b;
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    ctx.fillRect(xi, yi, 2, 2); // Draws a 1x1 rectangle at (50, 100)
 
                     i0 = edges[i0 - 1].s;
                     if (i1 === i0) break;
@@ -405,8 +389,6 @@ class imgdisp {
             }
         }
 
-        let imgD = new ImageData(imgdata, cols, rows);
-        ctx.putImageData(imgD, 0, 0);
         //
         this.#dispProcessTime();
 
@@ -481,13 +463,13 @@ class imgdisp {
         this.cv.dispatchEvent(imgDispErrEvent);
     }
 
-    loadImgFrommRoot() {
-        console.log("loadImgFrommRoot");
+    loadImgFrommRoot(runMode) {
         this.#t0 = Date.now();
+        console.log(this.#t0, "loadImgFrommRoot");
         let loadFromRootEvent = new CustomEvent('loadFromRoot', {
             bubbles: true,
             //detail: { msg: {id: this.id, cols: this.wd, rows: this.hd} } 
-            detail: { msg: { id: this.id, cols: this.cols, rows: this.rows } }
+            detail: { msg: { id: this.id, cols: this.cols, rows: this.rows, runMode: runMode } }
         });
         this.cv.dispatchEvent(loadFromRootEvent);
     }
@@ -561,8 +543,8 @@ class imgdisp {
                 this.dispQueueTimer = null;
             }
             this.dispQueueTimer = setInterval(() => {
-                this.loadImgFrommRoot();
-            }, 400);
+                this.loadImgFrommRoot(2);
+            }, 100);
         } else {
             this.error("startDisplayQueue: no correct start and end values to start display queue");
         }

@@ -2,8 +2,12 @@
 #include <chrono>
 #include <cstdint>
 #include <vector>
+#include <algorithm>
 #include <math.h>
 #include <numbers>
+#include <unordered_map>
+#include <cmath>
+#include <cstdint>
 
 #include "cvTools.h"
 
@@ -65,99 +69,116 @@ static float rad2degree = 1. / degree2rad;
 
 static std::vector<float> gmaskCurv;
 
-static processTime pTime;
+static processTime _ptime;
 std::chrono::time_point<std::chrono::system_clock> _start;
 
+
 void cvtCurvatureContours(
-    std::vector<edge> &edges,
-    std::vector<contour> &conts,
+    std::vector<edge>& edges,
+    std::vector<contour>& conts,
     uint32_t curvBd)
 {
-    int cnt, c, i, isize, bd, bsize;
-    float dx, dy, norm;
-    std::vector<edge>::iterator edg0, pt0, pt1, ptc;
-    std::vector<contour>::iterator cont;
+    cvtTimerStart();
 
-    edg0 = edges.begin();
+    edge* __restrict edg = edges.data();
+    const contour* __restrict cntArr = conts.data();
+    const int numConts = static_cast<int>(conts.size());
+    const int curvSize = 2 * static_cast<int>(curvBd) + 1;
 
-    // loop over contours
-    for (cont = conts.begin(); cont != conts.end(); cont++)
+    #pragma omp parallel
     {
+        // Reusable per-thread scratch buffer to linearize contour edge indices
+        std::vector<uint32_t> chain;
+        chain.reserve(1024);
 
-        bd = curvBd;
-        bsize = 2 * curvBd + 1;
-        if (cont->nofEdges < (uint32_t) bsize)
+        #pragma omp for schedule(dynamic, 16)
+        for (int cIdx = 0; cIdx < numConts; ++cIdx)
         {
-            bd = (int)(cont->nofEdges > 1);
-            bsize = 2 * bd + 1;
-        }
-        // closed ?
-        if (cont->start == cont->end)
-        {
-             // closed contour
-            // start point
-            pt0 = edg0 + (cont->start - 1);
-            for (i = bd; i >= 0; i--)
+            const contour& cont = cntArr[cIdx];
+            if (cont.nofEdges < 3) continue;
+
+            int bd = static_cast<int>(curvBd);
+            int bsize = curvSize;
+            if (cont.nofEdges < static_cast<uint32_t>(bsize))
             {
-                if (pt0->p > 0)
-                    pt0 = edg0 + (pt0->p - 1);
+                bd = (cont.nofEdges > 1) ? 1 : 0;
+                bsize = 2 * bd + 1;
             }
-            // end point
-            pt1 = edg0 + (cont->start - 1);
-            for (i = bd; i >= 0; i--)
+            if (bd == 0) continue;
+
+            const bool isClosed = (cont.start == cont.end);
+            const int n = static_cast<int>(cont.nofEdges);
+
+            // Linearize the contour's linked list once into contiguous memory
+            chain.clear();
+            uint32_t curr = cont.start - 1;
+            for (int k = 0; k < n; ++k)
             {
-                if (pt1->s > 0)
-                    pt1 = edg0 + (pt1->s - 1);
+                chain.push_back(curr);
+                if (edg[curr].s > 0)
+                    curr = edg[curr].s - 1;
+                else
+                    break;
             }
-            // center point
-            ptc = edg0 + (cont->start - 1);
-            //
-            cnt = cont->nofEdges;
-        }
-        else
-        {
-            // open contour
-            /// start point
-            pt0 = edg0 + (cont->start - 1);
-            // end point
-            pt1 = edg0 + (cont->start - 1);
-            for (i = bsize; i > 0; i--)
+
+            const int chainLen = static_cast<int>(chain.size());
+            if (chainLen < bsize) continue;
+
+            if (isClosed)
             {
-                if (pt1->s > 0)
-                    pt1 = edg0 + (pt1->s - 1);
-            }
-            // center point
-            ptc = edg0 + (cont->start - 1);
-            for (i = bd; i > 0; i--)
-            {
-                if (ptc->s > 0)
-                    ptc = edg0 + (ptc->s - 1);
-            }
-            //
-            cnt = cont->nofEdges - (2 * bd);
-        }
-        //
-        // calculate curvature
-        for (i = 0; i < cnt; i++)
-        {
-            if (pt1 != ptc && pt0 != ptc)
-            {
-                dx = pt1->xf - pt0->xf;
-                dy = pt1->yf - pt0->yf;
-                norm = sqrtf(powf(dx, 2) + powf(dy, 2));
-                if (norm > 0.0001)
+                // Closed contour: wrap indices around [0, chainLen)
+                // Note: matches original offset behavior (bd + 1 steps back/forward)
+                const int step = bd + 1;
+                for (int k = 0; k < chainLen; ++k)
                 {
-                    ptc->curv = fabsf((dx * (pt0->yf - ptc->yf)) - (dy * (pt0->xf - ptc->xf))) / norm;
+                    int i0 = (k - step) % chainLen;
+                    if (i0 < 0) i0 += chainLen;
+                    int i1 = (k + step) % chainLen;
+
+                    const uint32_t idx0 = chain[i0];
+                    const uint32_t idx1 = chain[i1];
+                    const uint32_t idxc = chain[k];
+
+                    if (idx1 != idxc && idx0 != idxc)
+                    {
+                        const float dx = edg[idx1].xf - edg[idx0].xf;
+                        const float dy = edg[idx1].yf - edg[idx0].yf;
+                        const float norm = dx * dx + dy * dy;
+
+                        if (norm > 0.0001f)
+                        {
+                            const float num = std::fabs((dx * (edg[idx0].yf - edg[idxc].yf)) -
+                                                        (dy * (edg[idx0].xf - edg[idxc].xf)));
+                            edg[idxc].curv = num / std::sqrt(norm);
+                        }
+                    }
                 }
             }
-            if (pt0->s > 0)
-                pt0 = edg0 + (pt0->s - 1);
-            if (pt1->s > 0)
-                pt1 = edg0 + (pt1->s - 1);
-            if (ptc->s > 0)
-                ptc = edg0 + (ptc->s - 1);
+            else
+            {
+                // Open contour: slide window [k - bd, k + bd]
+                for (int k = bd; k < chainLen - bd; ++k)
+                {
+                    const uint32_t idx0 = chain[k - bd];
+                    const uint32_t idx1 = chain[k + bd];
+                    const uint32_t idxc = chain[k];
+
+                    const float dx = edg[idx1].xf - edg[idx0].xf;
+                    const float dy = edg[idx1].yf - edg[idx0].yf;
+                    const float norm = dx * dx + dy * dy;
+
+                    if (norm > 0.0001f)
+                    {
+                        const float num = std::fabs((dx * (edg[idx0].yf - edg[idxc].yf)) -
+                                                    (dy * (edg[idx0].xf - edg[idxc].xf)));
+                        edg[idxc].curv = num / std::sqrt(norm);
+                    }
+                }
+            }
         }
     }
+
+    _ptime.cvtCurvatureContours = cvtTimerEnd();
 }
 
 /**
@@ -172,97 +193,72 @@ void cvtCurvatureContours(
  * The inputs 'mag' and 'dir' are results a previous gradient calculation.
  * Note: Both images will be thinned during processing.
  */
-
 void cvtEdgDetection(
-    std::vector<grad_float> &gradI,
-    std::vector<edge> &edges,
+    std::vector<grad_float>& gradI,
+    std::vector<edge>& edges,
     float thLow,
     float thHigh,
     uint32_t rows,
     uint32_t cols)
 {
-    float aF, mF, mF1, mF2, xf, yf;
-    float dxf, dyf;
-    uint32_t cnt = 0, val;
-    uint32_t i, j, c, c0, c1, size;
-    uint32_t u, v;
+    cvtTimerStart();
 
-    // work
-    //
-    size = rows * cols;
-    c0 = 2 * cols + 2;
-    c1 = size - (2 * cols) - 2;
-    for (c = c0; c < c1; c++)
+    grad_float* __restrict grad = gradI.data();
+    const int iCols = static_cast<int>(cols);
+    constexpr float INV_45 = 1.0f / 45.0f;
+
+    // Pre-allocate typical edge capacity (~5-10% of image) to avoid reallocations
+    edges.clear();
+    edges.reserve((rows * cols) / 16);
+
+    // Neighbor offset lookup tables for the 4 gradient angle sectors (0..3)
+    // Sector 0: [0, 45), Sector 1: [45, 90), Sector 2: [90, 135), Sector 3: [135, 180]
+    const int off1A[4] = { -1,         -iCols - 1, -iCols,     -iCols + 1 };
+    const int off1B[4] = { -iCols - 1, -iCols,     -iCols + 1,  1         };
+    const int off2A[4] = {  1,          iCols + 1,  iCols,      iCols - 1 };
+    const int off2B[4] = {  iCols + 1,  iCols,      iCols - 1, -1         };
+
+    uint32_t cnt = 0;
+
+    // Explicit (y, x) loops eliminate `c % cols` and `c / cols` divisions
+    for (uint32_t y = 2; y < rows - 2; ++y)
     {
-        mF = gradI[c].mag;
-        if (mF > thLow)
+        uint32_t c = y * cols + 2;
+        for (uint32_t x = 2; x < cols - 2; ++x, ++c)
         {
-            aF = gradI[c].dir;
-            if (aF >= 180.)
-                aF = aF - 180;
+            const float mF = grad[c].mag;
+            if (mF <= thLow) continue;
 
-            //  1 ->  PI/4
-            //  2 ->  PI/2
-            //  3 -> 3PI/4
-            //  4 ->  PI
-            if (aF >= 0. && aF < 45.)
-            {
-                aF /= 45;
-                mF1 = gradI[c - 1].mag + aF * (gradI[c - cols - 1].mag - gradI[c - 1].mag);
-                mF2 = gradI[c + 1].mag + aF * (gradI[c + cols + 1].mag - gradI[c + 1].mag);
-            }
-            else if (aF >= 45. && aF < 90.)
-            {
-                aF = (aF - 45) / 45;
-                mF1 = gradI[c - cols - 1].mag + aF * (gradI[c - cols].mag - gradI[c - cols - 1].mag);
-                mF2 = gradI[c + cols + 1].mag + aF * (gradI[c + cols].mag - gradI[c + cols + 1].mag);
-            }
-            else if (aF >= 90. && aF < 135.)
-            {
-                aF = (aF - 90) / 45;
-                mF1 = gradI[c - cols].mag + aF * (gradI[c - cols + 1].mag - gradI[c - cols].mag);
-                mF2 = gradI[c + cols].mag + aF * (gradI[c + cols - 1].mag - gradI[c + cols].mag);
-            }
-            else if (aF >= 135. && aF <= 180.)
-            {
-                aF = (aF - 135) / 45;
-                mF1 = gradI[c - cols + 1].mag + aF * (gradI[c + 1].mag - gradI[c - cols + 1].mag); // m1_F = p[5] + a_F * (p[2] - p[5]);
-                mF2 = gradI[c + cols - 1].mag + aF * (gradI[c - 1].mag - gradI[c + cols - 1].mag);
-            }
-            else
-            {
-                std::cout << "hallo " << c << ", " << aF << " ";
-            }
+            float dF = grad[c].dir;
+            float aF = (dF >= 180.0f) ? (dF - 180.0f) : dF;
+
+            // Map [0, 180] directly to sector index 0..3
+            int sector = static_cast<int>(aF * INV_45);
+            if (sector > 3) sector = 3; // Clamp edge case where aF == 180.0f
+
+            // Fractional interpolation weight within the 45-degree sector
+            float frac = (aF - (sector * 45.0f)) * INV_45;
+
+            const float m1a = grad[c + off1A[sector]].mag;
+            const float m1b = grad[c + off1B[sector]].mag;
+            const float mF1 = m1a + frac * (m1b - m1a);
+
+            const float m2a = grad[c + off2A[sector]].mag;
+            const float m2b = grad[c + off2B[sector]].mag;
+            const float mF2 = m2a + frac * (m2b - m2a);
 
             if (mF >= mF1 && mF >= mF2)
             {
-                gradI[c].edg = 1;
-                //
-                cnt++;
+                ++cnt;
+                grad[c].edg = cnt;
+
+                // Construct edge directly in-place (eliminates 2nd pass + std::fill)
+                edges.emplace_back(edge{x, y, 0.0f, 0.0f, mF, dF, -1.0f, 0, 0, 0, 0});
             }
         }
     }
 
-    //
-    // edge list
-    edges.resize(cnt);
-    std::fill(edges.begin(), edges.end(), edge{0, 0, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0, 0, 0, 0});
-    cnt = 0;
-    for (c = c0; c < c1; c++)
-    {
-        if (gradI[c].edg > 0)
-        {
-            if (cnt < edges.size())
-            {
-                edges[cnt].xi = (uint32_t)(c % cols);
-                edges[cnt].yi = (uint32_t)(c / cols);
-                edges[cnt].mag = gradI[c].mag;
-                edges[cnt].dir = gradI[c].dir;
-                cnt++;
-                gradI[c].edg = cnt;
-            }
-        }
-    }
+    _ptime.cvtEdgDetection = cvtTimerEnd();
 }
 
 /**
@@ -275,32 +271,43 @@ void cvtEdgFilter3x3(
     uint32_t cols)
 
 {
-    uint32_t j, c, cnt, val;
+    uint32_t j, pc, c, cnt, val;
+    std::vector<edge> tedges;
+    uint32_t __ly[8];
+
+    cvtTimerStart();
+
+    for (j = 0; j < 8; j++) __ly[j] = cols * ((uint32_t) _ly[j]);
+        
+    tedges.resize(edges.size());
+    cnt = 0;
     //
     // n3x3
-    cnt = 0;
-    for (std::vector<edge>::iterator pt = edges.begin(); pt != edges.end();)
+    for (const auto& edg : edges) 
     {
         val = 0;
+        pc = (edg.yi * cols) + edg.xi;
         for (j = 0; j < 8; j++)
         {
-            c = (pt->yi + _ly[j]) * cols + (pt->xi + _lx[j]);
-            if (gradI[c].edg > 0)
-                val += (1 << j);
+            c = pc + __ly[j] + _lx[j];
+            if (gradI[c].edg > 0) val += (1 << j);
         }
         if (_n3x3[val] == 0)
         {
-            gradI[(pt->yi * cols) + pt->xi].edg = 0;
-            pt = edges.erase(pt);
+            gradI[pc].edg = 0;
         }
         else
         {
-            pt->n3x3 = (uint32_t)_n3x3[val];
+            //edg.n3x3 = (uint32_t)_n3x3[val];
+            tedges[cnt] = edg;
             cnt++;
-            gradI[(pt->yi * cols) + pt->xi].edg = cnt;
-            pt++;
+            gradI[pc].edg = cnt;
         }
     }
+    tedges.resize(cnt);
+    edges = tedges;
+    
+    _ptime.cvtEdgFilter3x3 = cvtTimerEnd(); 
 }
 
 /**
@@ -313,17 +320,16 @@ void cvtEdgSubPixel(
     uint32_t cols)
 
 {
-    int cnt, u, v, j, c;
+    int  u, v, j, c;
     float xf, yf, mF;
 
-    for (std::vector<edge>::iterator pt = edges.begin(); pt != edges.end(); pt++)
+    cvtTimerStart();
+
+    for (auto& edg : edges) 
     {
-        cnt = 1;
-        mF = pt->mag;
-        // dxf = cosf(edges[i].dir * degree2rad);
-        // dyf = sinf(edges[i].dir * degree2rad);
-        u = pt->xi;
-        v = pt->yi;
+        mF = edg.mag;
+        u = edg.xi;
+        v = edg.yi;
         xf = mF * ((float)u);
         yf = mF * ((float)v);
         for (j = 0; j < 8; j++)
@@ -334,12 +340,12 @@ void cvtEdgSubPixel(
                 mF += gradI[c].mag;
                 xf += gradI[c].mag * ((float)u + _lx[j]);
                 yf += gradI[c].mag * ((float)v + _ly[j]);
-                cnt++;
             }
         }
-        pt->xf = xf / mF;
-        pt->yf = yf / mF;
+        edg.xf = xf / mF;
+        edg.yf = yf / mF;
     }
+    _ptime.cvtEdgSubPixel = cvtTimerEnd(); 
 }
 
 /**
@@ -358,6 +364,8 @@ void cvtLineDetection(
     int i, edgCnt, lineCnt;
     float dx, dy, norm, dis;
     bool valid;
+
+    cvtTimerStart();
 
     //
     lines.resize(edges.size());
@@ -492,6 +500,7 @@ void cvtLineDetection(
     }
 #endif
 
+    _ptime.cvtLineDetection = cvtTimerEnd(); 
 }
 
 /**
@@ -510,6 +519,8 @@ void cvtLinkEdges(
     float dr, dq, a1, a2;
     uint32_t x, y, xp, yp, c, pid;
     uint32_t di, dj, predecessor, cnt = 0;
+
+    cvtTimerStart();
 
     for (i = 0; i < nofEdges; i++)
     {
@@ -544,6 +555,9 @@ void cvtLinkEdges(
             }
         }
     }
+
+    _ptime.cvtLinkEdges = cvtTimerEnd(); 
+
 }
 
 /**
@@ -559,6 +573,8 @@ void cvtLinkContours(
     uint32_t cnt = 0, nofConts;
     int xi1, yi1, xj0, yj0;
     float mag;
+
+    cvtTimerStart();
 
     conts.resize(nofEdges);
     std::fill(conts.begin(), conts.end(), contour{0, 0, 0});
@@ -601,108 +617,10 @@ void cvtLinkContours(
         }
     }
     conts.resize(cnt);
+    _ptime.cvtLinkContours = cvtTimerEnd(); 
+
 }
 
-/**
- *
- */
-void cvtContoursCombine(
-    std::vector<edge> &edges,
-    std::vector<contour> &conts)
-{
-    uint32_t cnt, i, j, i0;
-    int xi, yi, xj, yj;
-
-    // contours divided?
-    cnt = 0;
-    for (i = 0; i < conts.size(); i++)
-    {
-        if (conts[i].start != conts[i].end)
-        {
-            // 1
-            xi = (int)edges[conts[i].end - 1].xi;
-            yi = (int)edges[conts[i].end - 1].yi;
-            for (j = i + 1; j < conts.size(); j++)
-            {
-                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
-                {
-                    xj = (int)edges[conts[j].start - 1].xi;
-                    yj = (int)edges[conts[j].start - 1].yi;
-                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
-                    {
-                        // change contour i
-                        edges[conts[i].end - 1].s = conts[j].start;
-                        edges[conts[j].start - 1].p = conts[i].end;
-                        i0 = conts[i].end;
-                        while (edges[i0 - 1].s > 0)
-                        {
-                            i0 = edges[i0 - 1].s;
-                            edges[i0 - 1].c = (i + 1);
-                            if (i0 == conts[i].start)
-                                break;
-                        }
-                        /*
-                         */
-                        conts[i].end = conts[j].end;
-                        conts[i].nofEdges += conts[j].nofEdges;
-                        conts[j].start = 0;
-                        conts[j].end = 0;
-                        conts[j].nofEdges = 0;
-                        cnt++;
-                        break;
-                    }
-                }
-            }
-            // 2
-            xi = (int)edges[conts[i].start - 1].xi;
-            yi = (int)edges[conts[i].start - 1].yi;
-            for (j = i + 1; j < conts.size(); j++)
-            {
-                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
-                {
-                    xj = (int)edges[conts[j].end - 1].xi;
-                    yj = (int)edges[conts[j].end - 1].yi;
-                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
-                    {
-                        // change contour i
-                        edges[conts[i].start - 1].p = conts[j].end;
-                        edges[conts[j].end - 1].s = conts[i].start;
-                        i0 = conts[i].start;
-                        while (edges[i0 - 1].p > 0)
-                        {
-                            i0 = edges[i0 - 1].p;
-                            edges[i0 - 1].c = (i + 1);
-                            if (i0 == conts[i].end)
-                                break;
-                        }
-                        /*
-                         */
-                        conts[i].start = conts[j].start;
-                        conts[i].nofEdges += conts[j].nofEdges;
-                        conts[j].start = 0;
-                        conts[j].end = 0;
-                        conts[j].nofEdges = 0;
-                        cnt++;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    std::vector<contour>::iterator cpt = conts.begin();
-    while (cpt != conts.end())
-    {
-        if (cpt->nofEdges == 0)
-        {
-            cpt = conts.erase(cpt);
-        }
-        else
-        {
-            cpt = cpt + 1;
-        }
-    }
-}
 
 void cvtEdgHistogram(
     std::vector<edge> &edges,
@@ -761,25 +679,70 @@ void cvtEdgLinkHistogram(
 /**
  *
  */
-void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size)
+void cvtEdgCurv2RGBA(
+    std::vector<edge> &edges, 
+    uint8_t *outRGBA, 
+    uint32_t rows, 
+    uint32_t cols, 
+    uint32_t xoff, 
+    uint32_t yoff)
 {
+    float cur;
+    uint8_t val, r, g, b;
     uint32_t channels = 4;
-    for (uint32_t i = 0, j = 0; i < size; i++)
+    uint32_t nofEdgs = edges.size();
+    uint32_t xi, yi, p;
+    for (uint32_t i = 0; i < nofEdgs; i++)
     {
-        if (gradI32F[i].edg > 0)
+        xi = edges[i].xi;
+        yi = edges[i].yi;
+        xi = xi + xoff;
+        yi = yi + yoff;
+        if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
         {
-            outRGBA[j] = 255;
-            outRGBA[j + 1] = 0;
-            outRGBA[j + 2] = 0;
+            // 
+            cur = edges[i].curv;
+            if (cur < 0.00001f)
+            {
+                r = g = b = 0;
+            }
+            else
+            {
+                val = (uint8_t) (cur*20.0f);
+                val = val > 255 ? 255 : val;
+                if (val >= 128)
+                {
+                    r = 255;
+                    g = 255 - (2 * (val - 128));
+                    b = 0x00;
+                }
+                else
+                {
+                    r = 2 * val;
+                    g = 255;
+                    b = 0x00;
+                }
+            }
+
+            p = yi * (channels * cols);
+            p = p + (channels * xi);
+            outRGBA[p] = r;
+            outRGBA[p + 1] = g;
+            outRGBA[p + 2] = b;
         }
-        j = j + channels;
     }
 }
 
 /**
  *
  */
-void cvtEdgPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff)
+void cvtEdgPts2RGBA(
+    std::vector<edge> &edges, 
+    uint8_t *outRGBA, 
+    uint32_t rows, 
+    uint32_t cols, 
+    uint32_t xoff, 
+    uint32_t yoff)
 {
     float dir, h, f;
     int sector;
@@ -797,11 +760,12 @@ void cvtEdgPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, u
         {
             // Normalize angle to [0.0, 360.0) range
             dir = fmodf(edges[i].dir, 360.0f);
+            /*
             if (dir < 0.0f)
             {
                 dir += 360.0f;
             }
-
+            */
             // Scale angle to 0.0 - 6.0 range (representing 6 color segments)
             h = dir / 60.0f;
             sector = (int)h;
@@ -881,34 +845,51 @@ void cvtGauss5x5(
     uint32_t cols)
 {
     uint32_t c, size, c0, c1;
+    uint32_t cols2 = 2*cols;
     float val;
+    
+    cvtTimerStart();
+    
+    // Inform compiler pointers do not overlap (alias)
+    const float* __restrict in = inI32F.data();
+    float* __restrict tmp = tmpI32F.data();
+    float* __restrict out = outI32F.data();
+
+
+    const float g0 = gmask32F[0];
+    const float g1 = gmask32F[1];
+    const float g2 = gmask32F[2];
+    const float g3 = gmask32F[3];
+    const float g4 = gmask32F[4];
 
     size = rows * cols;
     // filter in x-direction
     c0 = 2;
     c1 = size - 2;
+    #pragma omp simd
     for (c = c0; c < c1; c++)
     {
-        val = inI32F[c - 2] * gmask32F[0];
-        val += inI32F[c - 1] * gmask32F[1];
-        val += inI32F[c] * gmask32F[2];
-        val += inI32F[c + 1] * gmask32F[3];
-        val += inI32F[c + 2] * gmask32F[4];
-        tmpI32F[c] = val;
+        tmp[c] = in[c - 2] * g0 + 
+                 in[c - 1] * g1 + 
+                 in[c] * g2 + 
+                 in[c + 1] * g3 + 
+                 in[c + 2] * g4;
     }
 
     // filter in y-direction
     c0 = 2 * cols;
     c1 = size - (2 * cols);
+    #pragma omp simd
     for (c = c0; c < c1; c++)
     {
-        val = tmpI32F[c - (2 * cols)] * gmask32F[0];
-        val += tmpI32F[c - cols] * gmask32F[1];
-        val += tmpI32F[c] * gmask32F[2];
-        val += tmpI32F[c + cols] * gmask32F[3];
-        val += tmpI32F[c + (2 * cols)] * gmask32F[4];
-        outI32F[c] = val;
+        out[c] = tmp[c - cols2] * g0 +
+                tmp[c - cols] * g1 + 
+                tmp[c] * g2 + 
+                tmp[c + cols] * g3 +
+                tmp[c + cols2] * g4;
     }
+
+    _ptime.cvtGauss5x5 = cvtTimerEnd(); 
 }
 
 /**
@@ -916,50 +897,49 @@ void cvtGauss5x5(
  * mag [0.0 .. 1.0]
  * dir [0.0 .. 360.0]
  */
-float cvtGrad(
+void cvtGrad(
     std::vector<float> &inI32F,
     std::vector<grad_float> &gradI32F,
-    std::vector<uint32_t> &hist,
     float th,
     uint32_t rows,
     uint32_t cols)
 {
-    float dx, dy;
-    float mv, dv;
-    float pi = (float)(atan(1.0) * 4.);
-    float mmax = 0;
-    uint32_t c0, c;
-    uint32_t x, y;
+    float th_sq = th*th;
+    float RAD_TO_DEG = 57.295779513f; //180. / ((float)(atan(1.0) * 4.));;
+    int  x,y,yc;
+    int colsm3 = cols-3;
+    int rowsm3 = rows-3;
+    
+    cvtTimerStart();
 
-    // for (uint32_t i = 0; i < 256; i++)  hist[i] = 0;
-    std::fill(hist.begin(), hist.end(), 0);
-
-    std::fill(gradI32F.begin(), gradI32F.end(), grad_float{0.0f, 0.0f, 0.0f, 0.0f, 0});
     // work
-    for (y = 3; y < (rows - 3); y++)
+    
+    for (y = 3; y < rowsm3; y++)
     {
-        c0 = y * cols;
-        for (x = 3; x < (cols - 3); x++)
+        yc = y*cols;
+        const float* __restrict in0 = inI32F.data() + yc - cols;
+        const float* __restrict in1 = inI32F.data() + yc;
+        const float* __restrict in2 = inI32F.data() + yc + cols;
+        grad_float* __restrict out = gradI32F.data() + yc;
+    
+        #pragma omp simd
+        for (x = 3; x < colsm3; x++)
         {
-            c = c0 + x;
-            dx = 0.5f * (inI32F[c + 1] - inI32F[c - 1]);
-            dy = 0.5f * (inI32F[c + cols] - inI32F[c - cols]);
-            mv = sqrt(dx * dx + dy * dy);
-            if (mv > th)
+            float dx = 0.5f * (in1[x + 1] - in1[x - 1]);
+            float dy = 0.5f * (in2[x] - in0[x]);
+            float mv_sq = dx * dx + dy * dy;
+            float mv = 0, dv = 0;
+            if (mv_sq > th_sq)
             {
+                mv = std::sqrt(mv_sq);
                 // atan2f between [-180, 180]
-                dv = 180. * atan2f(dy, dx) / pi;
-                dv += 180;
+                dv = (std::atan2(dy, dx) * RAD_TO_DEG) + 180.0f;
                 // grad dir values [0, 360]
-                gradI32F[c] = {dx, dy, mv, dv, 0};
-                mmax = (mmax < mv) ? mv : mmax;
-                //
-                mv = mv > 255. ? 255. : mv;
-                hist[(uint8_t)mv]++;
             }
+            out[x] = {dx, dy, mv, dv, 0};
         }
     }
-    return (mmax);
+     _ptime.cvtGrad = cvtTimerEnd(); 
 }
 
 /**
@@ -983,6 +963,44 @@ void cvtInitGMask32F(float sigma, std::vector<float> &gmask32F, uint32_t size)
     for (i = 0; i < size; i++)
     {
         gmask32F[i] /= sum;
+    }
+}
+
+/**
+ *
+ */
+void cvtLines2RGBA(
+    std::vector<line> &lines, 
+    std::vector<edge> &edges, 
+    uint8_t *outRGBA, 
+    uint32_t rows, 
+    uint32_t cols, 
+    uint32_t xoff, 
+    uint32_t yoff)
+{
+    uint8_t val, r, g, b;
+    uint32_t channels = 4;
+    uint32_t nofLines = lines.size();
+    uint32_t c, nofEdges = 0;
+    uint32_t xi, yi, p;
+    edge edgS, edgE;
+
+    for (auto i = 0; i < nofLines; i++)
+    {
+        edgS = edges[ lines[i].start - 1];
+        nofEdges = lines[i].nofEdges;
+        c = 0;
+        for( c=0; c<nofEdges; c++){
+            xi = edgS.xi + xoff;
+            yi = edgS.yi + yoff;
+            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows){
+                p = yi * (channels * cols) + (channels * xi);
+                outRGBA[p] = 0x00;
+                outRGBA[p + 1] = 0x00;
+                outRGBA[p + 2] = 0xFF;
+            }
+            if( edgS.s > 0) edgS = edges[ edgS.s - 1];
+        }
     }
 }
 
@@ -1023,24 +1041,46 @@ void cvtMag2floatI(std::vector<grad_float> &gradI32F, std::vector<float> &out, u
  */
 void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
 {
-    // input image has got an RGBA structure
-    // pixels[0] = Red, pixels[1] = Green, pixels[2] = Blue, pixels[3] = Alpha
-    float r, g, b;
-    uint32_t channels = 4;
-
     cvtTimerStart();
 
-    for (uint32_t i = 0, j = 0; i < size; i++)
+    const uint8_t * __restrict in = inRGBA;
+    float * __restrict out = greyI32F.data();
+
+    // Standard ITU-R BT.601 luminance coefficients
+    constexpr float Wr = 0.2989f;
+    constexpr float Wg = 0.5870f;
+    constexpr float Wb = 0.1140f;
+
+    #pragma omp parallel for schedule(static)
+    for (uint32_t i = 0; i < size; i++)
     {
-        r = (float)inRGBA[j];
-        g = (float)inRGBA[j + 1];
-        b = (float)inRGBA[j + 2];
-        j = j + channels;
-        greyI32F[i] = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+        uint32_t idx = i * 4;
+        out[i] = static_cast<float>(in[idx])     * Wr +
+                 static_cast<float>(in[idx + 1]) * Wg +
+                 static_cast<float>(in[idx + 2]) * Wb;
     }
 
-    pTime.cvtRGBA2Grey = cvtTimerEnd(); 
+    _ptime.cvtRGBA2Grey = cvtTimerEnd(); 
 }
+
+void cvtVal2RGBA(uint8_t val, uint8_t *outRGBA, uint32_t size)
+{
+    cvtTimerStart();
+
+    uint8_t * __restrict out = outRGBA;
+
+    #pragma omp parallel for schedule(static)
+    for (uint32_t i = 0; i < size; i++)
+    {
+        uint32_t idx = i * 4;
+        out[idx] = val;
+        out[idx+1] = val;
+        out[idx+2] = val;
+    }
+
+}
+
+
 
 /**
  *
@@ -1133,11 +1173,24 @@ void cvtTimerStart(){
     _start = std::chrono::system_clock::now();
 }
 
-std::chrono::duration<double> cvtTimerEnd(){
+double cvtTimerEnd(){
     std::chrono::time_point<std::chrono::system_clock> end;
     end  = std::chrono::system_clock::now();
 
     std::chrono::duration<double, std::milli> duration = end - _start;
 
-    return(duration);
+    return(duration.count());
+}
+
+void cvtTimerValues(processTime *pTime){
+    pTime->cvtGauss5x5 = _ptime.cvtGauss5x5;
+    pTime->cvtRGBA2Grey = _ptime.cvtRGBA2Grey;
+    pTime->cvtGrad = _ptime.cvtGrad;
+    pTime->cvtEdgDetection = _ptime.cvtEdgDetection;
+    pTime->cvtEdgFilter3x3 = _ptime.cvtEdgFilter3x3;
+    pTime->cvtEdgSubPixel = _ptime.cvtEdgSubPixel;
+    pTime->cvtLinkEdges = _ptime.cvtLinkEdges;
+    pTime->cvtLinkContours = _ptime.cvtLinkContours;
+    pTime->cvtCurvatureContours = _ptime.cvtCurvatureContours;
+    pTime->cvtLineDetection = _ptime.cvtLineDetection;
 }

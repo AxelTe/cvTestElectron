@@ -10,6 +10,7 @@ let config = JSON.parse(fs.readFileSync(configFile));
 let imgseq = require('../main/imgseq.js');
 let mainWin = undefined;
 let imgPyramidWin = undefined;
+let runMode = 0;
 
 
 //
@@ -171,6 +172,7 @@ function sendInfoToPyramidImg(msg) {
 // Empfängt den Wert vom Renderer
 ipcMain.on('loadFromRoot', (event, data) => {
   console.log("loadFromRoot", data);
+  if (data.hasOwnProperty("runMode")) runMode = data.runMode;
   if (data.hasOwnProperty("meaning")) {
     switch(data.meaning){
       case "loadFromRoot":
@@ -196,9 +198,12 @@ imgseq.on("imgseqInfo", function (msg) {
   }
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
-    imgseq.showImg(0);
+    imgseq.showImg(4);
     if(config.imagePyramids>1) imgseq.showImg(12);
-    imgseq.getEdgeData();
+    if(runMode !== 2){
+      imgseq.getEdgeData();
+      imgseq.getTimerValues();
+    }
   }
   if (msg.hasOwnProperty("disp")) {
     if(msg.disp === "main") sendInfoToMainGUI(msg);
@@ -214,7 +219,10 @@ imgseq.on("imgseqInfo", function (msg) {
     }
   }
   if (msg.hasOwnProperty("edgeData")) {
-    sendInfoToMainGUI(msg);
+    sendInfoToMainGUI({edgeData: msg.edgeData[0]});
+    if(msg.edgeData.length>1){
+      sendInfoToPyramidImg({edgeData: msg.edgeData.slice(1)});
+    }
   }
   if (msg.hasOwnProperty("histEdges")) {
     sendInfoToMainGUI(msg);

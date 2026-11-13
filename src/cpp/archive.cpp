@@ -2,6 +2,8 @@ void cvtEdgLinkHistogram(std::vector<grad_float> &gradI,std::vector<edge> &edges
 void cvtLinkEdges(std::vector<edge> &edges, std::vector<grad_float> &gradI, uint32_t rows, uint32_t cols);
 void cvtLinkPts2RGBA(std::vector<edge> &edges, uint8_t *outRGBA, uint32_t rows, uint32_t cols, uint32_t xoff, uint32_t yoff);
 void cvtEdges2Contours(std::vector<edge> &edges);
+void cvtContoursCombine(std::vector<edge> &edges, std::vector<contour> &conts);
+void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size);
 
 
 
@@ -218,5 +220,122 @@ void cvtEdges2Contours(std::vector<edge> &edges)
                 }
             }
         }
+    }
+}
+
+/**
+ *
+ */
+void cvtContoursCombine(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts)
+{
+    uint32_t cnt, i, j, i0;
+    int xi, yi, xj, yj;
+    std::vector<contour>::iterator icont, jcont;
+
+    cvtTimerStart();
+
+    // contours divided?
+    cnt = 0;
+    for (i = 0; i < conts.size(); i++)
+    {
+        if (conts[i].start != conts[i].end)
+        {
+            // 1
+            xi = (int)edges[conts[i].end - 1].xi;
+            yi = (int)edges[conts[i].end - 1].yi;
+            for (j = i + 1; j < conts.size(); j++)
+            {
+                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
+                {
+                    xj = (int)edges[conts[j].start - 1].xi;
+                    yj = (int)edges[conts[j].start - 1].yi;
+                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
+                    {
+                        // change contour i
+                        edges[conts[i].end - 1].s = conts[j].start;
+                        edges[conts[j].start - 1].p = conts[i].end;
+                        i0 = conts[i].end;
+                        while (edges[i0 - 1].s > 0)
+                        {
+                            i0 = edges[i0 - 1].s;
+                            edges[i0 - 1].c = (i + 1);
+                            if (i0 == conts[i].start)
+                                break;
+                        }
+                        /*
+                         */
+                        conts[i].end = conts[j].end;
+                        conts[i].nofEdges += conts[j].nofEdges;
+                        conts[j].start = 0;
+                        conts[j].end = 0;
+                        conts[j].nofEdges = 0;
+                        cnt++;
+                        break;
+                    }
+                }
+            }
+            // 2
+            xi = (int)edges[conts[i].start - 1].xi;
+            yi = (int)edges[conts[i].start - 1].yi;
+            for (j = i + 1; j < conts.size(); j++)
+            {
+                if (conts[j].nofEdges > 0 && (conts[j].start != conts[j].end))
+                {
+                    xj = (int)edges[conts[j].end - 1].xi;
+                    yj = (int)edges[conts[j].end - 1].yi;
+                    if (abs(xi - xj) <= 1 && abs(yi - yj) <= 1)
+                    {
+                        // change contour i
+                        edges[conts[i].start - 1].p = conts[j].end;
+                        edges[conts[j].end - 1].s = conts[i].start;
+                        i0 = conts[i].start;
+                        while (edges[i0 - 1].p > 0)
+                        {
+                            i0 = edges[i0 - 1].p;
+                            edges[i0 - 1].c = (i + 1);
+                            if (i0 == conts[i].end)
+                                break;
+                        }
+                        /*
+                         */
+                        conts[i].start = conts[j].start;
+                        conts[i].nofEdges += conts[j].nofEdges;
+                        conts[j].start = 0;
+                        conts[j].end = 0;
+                        conts[j].nofEdges = 0;
+                        cnt++;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    conts.erase(
+        std::remove_if(conts.begin(), conts.end(), [](const contour& c) {
+            return c.nofEdges == 0;
+        }),
+        conts.end()
+    );
+    
+    _ptime.cvtContoursCombine = cvtTimerEnd(); 
+
+}
+
+
+void cvtEdg2RGBA(std::vector<grad_float> &gradI32F, uint8_t *outRGBA, uint32_t size)
+{
+    uint32_t channels = 4;
+    for (uint32_t i = 0, j = 0; i < size; i++)
+    {
+        if (gradI32F[i].edg > 0)
+        {
+            outRGBA[j] = 255;
+            outRGBA[j + 1] = 0;
+            outRGBA[j + 2] = 0;
+        }
+        j = j + channels;
     }
 }

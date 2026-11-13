@@ -468,7 +468,7 @@ class mouseOnCanvas {
             const bitmap = await createImageBitmap(self.imgDisp.imgD, sourceX, sourceY, self.#sourceSize, self.#sourceSize);
             self.#magCtx.clearRect(0, 0, self.#magSize, self.#magSize);
             self.#magCtx.drawImage(bitmap, 0, 0, self.#magSize, self.#magSize);
-            //
+            /*
             if (self.imgDisp.edgeData !== null) {
                 let xf, yf;
                 let radius = 1.0;
@@ -558,6 +558,7 @@ class mouseOnCanvas {
                 self.#magCtx.fillStyle = fillStyle;
                 self.#magCtx.strokeStyle = strokeStyle;
             }
+            */
         } else {
             self.#cvout.style.display = 'none';
         }

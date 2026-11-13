@@ -1,14 +1,14 @@
 {
   "imgDisp": {
-    "edgeMode": 3
+    "edgeMode": 1
   },
   "imgseq": {
-    "path": "C:\\Users\\axelt.FUTURESHAPE\\Desktop\\projects\\sequences\\video_4",
-    "seqname": "video_4.json",
+    "path": "C:\\Users\\axelt.FUTURESHAPE\\Desktop\\projects\\sequences\\testMuster2026-03-30",
+    "seqname": "testMuster2026-03-30.json",
     "last": 1
   },
   "imagePyramids": 1,
-  "gradThLow": 2,
+  "gradThLow": 5,
   "gradThHigh": 10,
   "curvBd": 20
 }
