@@ -30,12 +30,50 @@ let moc = new mouseOnCanvas(
 // button function
 //---------------------------------------------
 //
-let inputBtn = document.getElementById('InputBtn');
+let paramBtn = document.getElementById('parameterBtn');    
+let paramCloseBtn = document.getElementById('closeMenuBtn');
+let paramSBar = document.getElementById('parameterSBar');
+let inputBtn = document.getElementById('inputBtn');
 let runBtn = document.getElementById('runBtn');
 let lastBtn = document.getElementById('lastBtn');
 let nextBtn = document.getElementById('nextBtn');
+
 let run = 0;
 
+paramBtn.addEventListener('click', async () => {
+  paramSBar.classList.add('open');
+  paramSBar.setAttribute('aria-hidden', 'false');
+  //
+  let el = document.getElementById("btnLine");
+  el.style.width = "75%";
+  el.style.left = "25%";
+  //
+  el = document.getElementById("mainFrame");
+  el.style.width = "75%";
+  el.style.left = "25%";
+  //
+  el = document.getElementById("footLine");
+  el.style.width = "75%";
+  el.style.left = "25%";
+  //
+});
+
+paramCloseBtn.addEventListener('click', async () => {
+  paramSBar.classList.remove('open');
+  paramSBar.setAttribute('aria-hidden', 'true');
+  let el = document.getElementById("btnLine");
+  el.style.width = "100%";
+  el.style.left = "0%";
+  //
+  el = document.getElementById("mainFrame");
+  el.style.width = "100%";
+  el.style.left = "0%";
+  //
+  el = document.getElementById("footLine");
+  el.style.width = "100%";
+  el.style.left = "0%";
+});
+    
 inputBtn.addEventListener('click', async () => {
   // Ruft die Funktion aus dem Preload-Skript auf
   const paths = await window.electronAPI.selectFiles();
@@ -99,6 +137,21 @@ resetBtn.addEventListener('click', async () => {
   imgDisp.id = 0;
   imgDisp.loadImgFrommRoot(run);
 });
+
+//
+// slider function
+//---------------------------------------------
+//
+let gradThSlider = document.getElementById('gradThSlider');
+
+gradThSlider.addEventListener('change', async (el) => {
+  console.log("gradThSlider value change", el.target.value);
+  let msg = {meaning: "newGradThLow", value: el.target.value};
+  let elem = document.getElementById("gradTh");
+  elem.innerText = el.target.value;
+  window.electronAPI.loadFromRoot(msg);
+});
+
 //
 //
 //---------------------------------------------
@@ -187,8 +240,6 @@ window.electronAPI.onInfo((msg) => {
 /**
  * 
  */
-cv = document.getElementById('incv');
-
 cv.addEventListener('imgDispError', (e) => {
   alert('imgDispError:' + " " + e.detail.msg);
 });

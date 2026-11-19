@@ -72,114 +72,209 @@ static std::vector<float> gmaskCurv;
 static processTime _ptime;
 std::chrono::time_point<std::chrono::system_clock> _start;
 
-
-void cvtCurvatureContours(
-    std::vector<edge>& edges,
-    std::vector<contour>& conts,
-    uint32_t curvBd)
+/**
+ *
+ */
+void cvtConts2RGBA(
+    std::vector<contour> &conts,
+    std::vector<edge> &edges,
+    uint8_t *outRGBA,
+    float curvTh,
+    uint32_t rows,
+    uint32_t cols,
+    uint32_t xoff,
+    uint32_t yoff)
 {
-    cvtTimerStart();
+    uint32_t channels = 4;
+    uint32_t nofConts = conts.size();
+    uint32_t xi, yi, p;
+    uint16_t val;
+    contour cont;
+    edge edg;
 
-    edge* __restrict edg = edges.data();
-    const contour* __restrict cntArr = conts.data();
-    const int numConts = static_cast<int>(conts.size());
-    const int curvSize = 2 * static_cast<int>(curvBd) + 1;
-
-    #pragma omp parallel
+    for (uint32_t i = 0; i < nofConts; i++)
     {
-        // Reusable per-thread scratch buffer to linearize contour edge indices
-        std::vector<uint32_t> chain;
-        chain.reserve(1024);
-
-        #pragma omp for schedule(dynamic, 16)
-        for (int cIdx = 0; cIdx < numConts; ++cIdx)
+        cont = conts[i];
+        edg = edges[cont.start - 1];
+        for (auto i = cont.nofEdges; i > 0; --i)
         {
-            const contour& cont = cntArr[cIdx];
-            if (cont.nofEdges < 3) continue;
-
-            int bd = static_cast<int>(curvBd);
-            int bsize = curvSize;
-            if (cont.nofEdges < static_cast<uint32_t>(bsize))
-            {
-                bd = (cont.nofEdges > 1) ? 1 : 0;
-                bsize = 2 * bd + 1;
+            xi = edg.xi + xoff;
+            yi = edg.yi + yoff;
+            p = channels * (yi * cols + xi);
+            val = ((uint16_t)edg.mag) + 128;
+            val = val > 255 ? 255 : val;
+            if( edg.curv >= curvTh){
+                outRGBA[p] = (uint8_t)val;
+                outRGBA[p + 1] = 0;
+                outRGBA[p + 2] = 0;
+            } 
+            else {
+                outRGBA[p] = (uint8_t)val;
+                outRGBA[p + 1] = (uint8_t)val;
+                outRGBA[p + 2] = (uint8_t)val;
             }
-            if (bd == 0) continue;
+            if (edg.s > 0)
+                edg = edges[edg.s - 1];
 
-            const bool isClosed = (cont.start == cont.end);
-            const int n = static_cast<int>(cont.nofEdges);
-
-            // Linearize the contour's linked list once into contiguous memory
-            chain.clear();
-            uint32_t curr = cont.start - 1;
-            for (int k = 0; k < n; ++k)
+        }
+        if (cont.start == cont.end)
+        {
+            // closed contours
+            xi = edges[cont.start - 1].xi + xoff;
+            yi = edges[cont.start - 1].yi + yoff;
+            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
             {
-                chain.push_back(curr);
-                if (edg[curr].s > 0)
-                    curr = edg[curr].s - 1;
-                else
-                    break;
+                p = channels * (yi * cols + xi);
+                outRGBA[p] = 0x00;
+                outRGBA[p + 1] = 0xff;
+                outRGBA[p + 2] = 0xff;
             }
-
-            const int chainLen = static_cast<int>(chain.size());
-            if (chainLen < bsize) continue;
-
-            if (isClosed)
+        }
+        else
+        {
+            // open contours
+            // start points
+            xi = edges[cont.start - 1].xi + xoff;
+            yi = edges[cont.start - 1].yi + yoff;
+            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
             {
-                // Closed contour: wrap indices around [0, chainLen)
-                // Note: matches original offset behavior (bd + 1 steps back/forward)
-                const int step = bd + 1;
-                for (int k = 0; k < chainLen; ++k)
-                {
-                    int i0 = (k - step) % chainLen;
-                    if (i0 < 0) i0 += chainLen;
-                    int i1 = (k + step) % chainLen;
-
-                    const uint32_t idx0 = chain[i0];
-                    const uint32_t idx1 = chain[i1];
-                    const uint32_t idxc = chain[k];
-
-                    if (idx1 != idxc && idx0 != idxc)
-                    {
-                        const float dx = edg[idx1].xf - edg[idx0].xf;
-                        const float dy = edg[idx1].yf - edg[idx0].yf;
-                        const float norm = dx * dx + dy * dy;
-
-                        if (norm > 0.0001f)
-                        {
-                            const float num = std::fabs((dx * (edg[idx0].yf - edg[idxc].yf)) -
-                                                        (dy * (edg[idx0].xf - edg[idxc].xf)));
-                            edg[idxc].curv = num / std::sqrt(norm);
-                        }
-                    }
-                }
+                p = channels * (yi * cols + xi);
+                outRGBA[p] = 0x00;
+                outRGBA[p + 1] = 0xff;
+                outRGBA[p + 2] = 0x00;
             }
-            else
+            // end points
+            xi = edges[cont.end - 1].xi + xoff;
+            yi = edges[cont.end - 1].yi + yoff;
+            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
             {
-                // Open contour: slide window [k - bd, k + bd]
-                for (int k = bd; k < chainLen - bd; ++k)
-                {
-                    const uint32_t idx0 = chain[k - bd];
-                    const uint32_t idx1 = chain[k + bd];
-                    const uint32_t idxc = chain[k];
-
-                    const float dx = edg[idx1].xf - edg[idx0].xf;
-                    const float dy = edg[idx1].yf - edg[idx0].yf;
-                    const float norm = dx * dx + dy * dy;
-
-                    if (norm > 0.0001f)
-                    {
-                        const float num = std::fabs((dx * (edg[idx0].yf - edg[idxc].yf)) -
-                                                    (dy * (edg[idx0].xf - edg[idxc].xf)));
-                        edg[idxc].curv = num / std::sqrt(norm);
-                    }
-                }
+                p = channels * (yi * cols + xi);
+                outRGBA[p] = 0x00;
+                outRGBA[p + 1] = 0x00;
+                outRGBA[p + 2] = 0xff;
             }
         }
     }
+}
 
+#if 0
+
+void cvtCurvatureContours(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts,
+    uint32_t curvBd)
+{
+    int numConts = conts.size();
+    contour cont;
+
+    cvtTimerStart();
+
+    for (int cIdx = 0; cIdx < numConts; ++cIdx)
+    {
+        cont = conts[cIdx];
+        int nofEdges = cont.nofEdges;
+        edge *edgS, *edgP, *edg = &edges[cont.start-1];
+        for(auto i=0; i<nofEdges; ++i){
+            // forward
+            edgS = edg;
+            int x0 = edgS->xi;
+            int y0 = edgS->yi;
+            int dx, dy;
+            float arcL = 0.0f;
+            for(auto k=0; k<curvBd; ++k){
+                if( edgS->s > 0 ){
+                    edgS = &edges[edgS->s -1];
+                    dx = abs((int) (edgS->xi - x0));
+                    dy = abs((int) (edgS->yi - y0));
+                    arcL = (dy>0 && dx>0) ? (arcL+1.414214) : (arcL+1.0f);
+                    x0 = edgS->xi;
+                    y0 = edgS->yi;
+                }
+            }
+            //backward
+            edgP = edg;
+            x0 = edgP->xi;
+            y0 = edgP->yi;
+            for(auto k=0; k<curvBd; ++k){
+                if( edgP->p > 0 ){
+                    edgP = &edges[edgP->p -1];
+                    dx = abs((int) (edgP->xi - x0));
+                    dy = abs((int) (edgP->yi - y0));
+                    arcL = (dy>0 && dx>0) ? (arcL+1.414214) : (arcL+1.0f);
+                    x0 = edgP->xi;
+                    y0 = edgP->yi;
+                }
+            }
+            if(arcL > 0){
+                edg->curv = fabs(edgS->dir - edgP->dir);
+                edg->curv = std::min(edg->curv, 360.0f-edg->curv);
+                edg->curv /= arcL;
+            }
+            if(edg->s > 0) edg = &edges[edg->s - 1];
+        }
+    }
     _ptime.cvtCurvatureContours = cvtTimerEnd();
 }
+
+#else
+
+void cvtCurvatureContours(
+    std::vector<edge> &edges,
+    std::vector<contour> &conts,
+    uint32_t curvBd)
+{
+    int numConts = conts.size();
+    contour cont;
+
+    cvtTimerStart();
+
+    for (int cIdx = 0; cIdx < numConts; ++cIdx)
+    {
+        cont = conts[cIdx];
+        int nofEdges = cont.nofEdges;
+        edge *edgS, *edgP, *edg = &edges[cont.start-1];
+        for(auto i=0; i<nofEdges; ++i){
+            // forward
+            edgS = edg;
+            float x0 = edgS->xf;
+            float y0 = edgS->yf;
+            float dx, dy;
+            float arcL = 0.0f;
+            for(auto k=0; k<curvBd; ++k){
+                if( edgS->s > 0 ){
+                    edgS = &edges[edgS->s -1];
+                    dx = edgS->xf - x0;
+                    dy = edgS->yf - y0;
+                    arcL += sqrt( dx*dx + dy*dy );
+                    x0 = edgS->xf;
+                    y0 = edgS->yf;
+                }
+            }
+            //backward
+            edgP = edg;
+            x0 = edgP->xf;
+            y0 = edgP->yf;
+            for(auto k=0; k<curvBd; ++k){
+                if( edgP->p > 0 ){
+                    edgP = &edges[edgP->p -1];
+                    dx = edgP->xf - x0;
+                    dy = edgP->yf - y0;
+                    arcL += sqrt( dx*dx + dy*dy );
+                    x0 = edgP->xf;
+                    y0 = edgP->yf;
+                }
+            }
+            if(arcL > 0){
+                edg->curv = fabs(edgS->dir - edgP->dir);
+                edg->curv = std::min(edg->curv, 360.0f-edg->curv);
+                edg->curv /= arcL;
+            }
+            if(edg->s > 0) edg = &edges[edg->s - 1];
+        }
+    }
+    _ptime.cvtCurvatureContours = cvtTimerEnd();
+}
+#endif
 
 /**
  * Performs edge-thinning via non-local maxima suppression
@@ -194,29 +289,28 @@ void cvtCurvatureContours(
  * Note: Both images will be thinned during processing.
  */
 void cvtEdgDetection(
-    std::vector<grad_float>& gradI,
-    std::vector<edge>& edges,
+    std::vector<grad_float> &gradI,
+    std::vector<edge> &edges,
     float thLow,
-    float thHigh,
     uint32_t rows,
     uint32_t cols)
 {
     cvtTimerStart();
 
-    grad_float* __restrict grad = gradI.data();
+    grad_float *__restrict grad = gradI.data();
     const int iCols = static_cast<int>(cols);
     constexpr float INV_45 = 1.0f / 45.0f;
 
     // Pre-allocate typical edge capacity (~5-10% of image) to avoid reallocations
     edges.clear();
-    edges.reserve((rows * cols) / 16);
+    edges.reserve((rows * cols) / 10);
 
     // Neighbor offset lookup tables for the 4 gradient angle sectors (0..3)
     // Sector 0: [0, 45), Sector 1: [45, 90), Sector 2: [90, 135), Sector 3: [135, 180]
-    const int off1A[4] = { -1,         -iCols - 1, -iCols,     -iCols + 1 };
-    const int off1B[4] = { -iCols - 1, -iCols,     -iCols + 1,  1         };
-    const int off2A[4] = {  1,          iCols + 1,  iCols,      iCols - 1 };
-    const int off2B[4] = {  iCols + 1,  iCols,      iCols - 1, -1         };
+    const int off1A[4] = {-1, -iCols - 1, -iCols, -iCols + 1};
+    const int off1B[4] = {-iCols - 1, -iCols, -iCols + 1, 1};
+    const int off2A[4] = {1, iCols + 1, iCols, iCols - 1};
+    const int off2B[4] = {iCols + 1, iCols, iCols - 1, -1};
 
     uint32_t cnt = 0;
 
@@ -227,14 +321,16 @@ void cvtEdgDetection(
         for (uint32_t x = 2; x < cols - 2; ++x, ++c)
         {
             const float mF = grad[c].mag;
-            if (mF <= thLow) continue;
+            if (mF <= thLow)
+                continue;
 
             float dF = grad[c].dir;
             float aF = (dF >= 180.0f) ? (dF - 180.0f) : dF;
 
             // Map [0, 180] directly to sector index 0..3
             int sector = static_cast<int>(aF * INV_45);
-            if (sector > 3) sector = 3; // Clamp edge case where aF == 180.0f
+            if (sector > 3)
+                sector = 3; // Clamp edge case where aF == 180.0f
 
             // Fractional interpolation weight within the 45-degree sector
             float frac = (aF - (sector * 45.0f)) * INV_45;
@@ -277,20 +373,22 @@ void cvtEdgFilter3x3(
 
     cvtTimerStart();
 
-    for (j = 0; j < 8; j++) __ly[j] = cols * ((uint32_t) _ly[j]);
-        
+    for (j = 0; j < 8; j++)
+        __ly[j] = cols * ((uint32_t)_ly[j]);
+
     tedges.resize(edges.size());
     cnt = 0;
     //
     // n3x3
-    for (const auto& edg : edges) 
+    for (const auto &edg : edges)
     {
         val = 0;
         pc = (edg.yi * cols) + edg.xi;
         for (j = 0; j < 8; j++)
         {
             c = pc + __ly[j] + _lx[j];
-            if (gradI[c].edg > 0) val += (1 << j);
+            if (gradI[c].edg > 0)
+                val += (1 << j);
         }
         if (_n3x3[val] == 0)
         {
@@ -298,16 +396,16 @@ void cvtEdgFilter3x3(
         }
         else
         {
-            //edg.n3x3 = (uint32_t)_n3x3[val];
+            // edg.n3x3 = (uint32_t)_n3x3[val];
             tedges[cnt] = edg;
             cnt++;
             gradI[pc].edg = cnt;
         }
     }
     tedges.resize(cnt);
-    edges = tedges;
-    
-    _ptime.cvtEdgFilter3x3 = cvtTimerEnd(); 
+    edges = std::move(tedges);
+
+    _ptime.cvtEdgFilter3x3 = cvtTimerEnd();
 }
 
 /**
@@ -320,12 +418,12 @@ void cvtEdgSubPixel(
     uint32_t cols)
 
 {
-    int  u, v, j, c;
+    int u, v, j, c;
     float xf, yf, mF;
 
     cvtTimerStart();
 
-    for (auto& edg : edges) 
+    for (auto &edg : edges)
     {
         mF = edg.mag;
         u = edg.xi;
@@ -345,7 +443,7 @@ void cvtEdgSubPixel(
         edg.xf = xf / mF;
         edg.yf = yf / mF;
     }
-    _ptime.cvtEdgSubPixel = cvtTimerEnd(); 
+    _ptime.cvtEdgSubPixel = cvtTimerEnd();
 }
 
 /**
@@ -355,108 +453,110 @@ void cvtLineDetection(
     std::vector<edge> &edges,
     std::vector<contour> &contours,
     std::vector<line> &lines,
-    uint32_t curvBd)
+    uint32_t curvBd,
+    float curvTh,
+    float lineTh
+)
 {
-
-    std::vector<contour>::iterator cont;
-    std::vector<edge>::iterator ept, tstart, tend;
-    std::vector<line>::iterator lineP;
-    int i, edgCnt, lineCnt;
-    float dx, dy, norm, dis;
-    bool valid;
-
+   
     cvtTimerStart();
 
     //
-    lines.resize(edges.size());
-    std::fill(lines.begin(), lines.end(), line{0, 0, 0, 0});
-    lineP = lines.begin();
-
     // loop over contours
-    for (cont = contours.begin(); cont != contours.end(); cont++)
+    uint32_t nofConts = contours.size();
+    uint32_t nofEdges = edges.size();
+    lines.clear();
+    lines.reserve(nofEdges);
+    for (auto i=0; i<(nofConts); i++) 
     {
-        if (cont->nofEdges > (2 * curvBd + 1))
+        contour *cont = &contours[i];
+        if (cont->nofEdges > 2)
         {
-            edgCnt = 0;
-            ept = edges.begin() + cont->start - 1;
-            for (int i = 0; i < cont->nofEdges; i++)
+            uint32_t edgCnt = 0;
+            uint32_t edgId = cont->start;
+            uint32_t tstart, tend;
+            
+            for (auto j = 0; j < cont->nofEdges; j++)
             {
-                if (ept->curv >= 0 && ept->curv < 0.9)
+                edge edg = edges[edgId-1];
+                if (edg.curv >= 0 && edg.curv < curvTh)
                 {
                     if (edgCnt == 0)
                     {
-                        tstart = ept;
+                        tstart = edgId;
                     }
-                    tend = ept;
+                    tend = edgId;
                     edgCnt++;
                 }
                 else
                 {
-                    if (edgCnt > 10)
+                    if (edgCnt > curvBd)
                     {
-                        lineP->start = std::distance(edges.begin(), tstart) + 1;
-                        lineP->end = std::distance(edges.begin(), tend) + 1;
-                        lineP->cont = std::distance(contours.begin(), cont) + 1;
-                        lineP->nofEdges = edgCnt;
-                        lineP++;
+                        lines.emplace_back(line{tstart, tend, (uint32_t) (i+1), edgCnt});
                     }
                     edgCnt = 0;
                 }
-                if (ept->s > 0)
-                    ept = edges.begin() + (ept->s - 1);
-                else
-                    break;
+                if (edg.s > 0) edgId = edg.s;
+                else break;
             }
-            if (edgCnt > 10)
+            if (edgCnt > curvBd && tstart != tend)
             {
-                lineP->start = std::distance(edges.begin(), tstart) + 1;
-                lineP->end = std::distance(edges.begin(), tend) + 1;
-                lineP->cont = std::distance(contours.begin(), cont) + 1;
-                lineP->nofEdges = edgCnt;
-                lineP++;
+                lines.emplace_back(line{tstart, tend, (uint32_t) (i+1), edgCnt});
             }
         }
     }
 
-    lineCnt = std::distance(lines.begin(), lineP);
-    lines.resize(lineCnt);
-
-#if 1
     // prove straight lines
-    for (lineP = lines.begin(); lineP != lines.end();)
+#if 1
+    // Precompute squared threshold to avoid sqrt() inside the loop
+    const int nofLines = lines.size();
+    std::vector<line> tlines;
+    tlines.reserve( nofLines );
+    int cnt = 0;
+    float cross;
+        
+    for (auto l=0; l<nofLines; ++l)
     {
-        tstart = edges.begin() + (lineP->start - 1);
-        tend = edges.begin() + (lineP->end - 1);
-        dx = tend->xf - tstart->xf;
-        dy = tend->yf - tstart->yf;
-        norm = sqrtf(powf(dx, 2) + powf(dy, 2));
-        valid = true;
-        if (norm > 0.0001)
-        {
-            ept = tstart;
-            for (i = 0; i < lineP->nofEdges; i++)
-            {
-                if (ept->s > 0) ept = edges.begin() + (ept->s - 1);
-                dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
-                if (dis > 1.0)
-                {
+        line *lineP = &lines[l];
+        edge* edgS = &edges[lineP->start - 1];
+        edge* edgE = &edges[lineP->end - 1];
+
+        const float dx = edgE->xf - edgS->xf;
+        const float dy = edgE->yf - edgS->yf;
+        const float len_sq = dx * dx + dy * dy;
+
+        // Guard against closed loops or degenerate zero-length segments
+        if (len_sq < 0.001f) {
+            continue;
+        }
+
+        const float threshold_sq = (lineTh * lineTh) * len_sq;
+        const int nofEdges = lineP->nofEdges;
+        edge *edg = edgS;
+        bool valid = true;
+        for (auto i = 1; i < nofEdges; ++i) {
+            if(edg->s>0){
+                edg = &edges[edg->s-1];
+                const float vx = edg->xf - edgS->xf;
+                const float vy = edg->yf - edgS->yf;
+
+                // 1. Perpendicular distance check (2D cross product squared)
+                cross = vx * dy - vy * dx;
+                if ((cross * cross) > threshold_sq) {
                     valid = false;
-                    break;
+                    continue;
                 }
             }
         }
-        else
-        {
-            valid = false;
+        if(valid){
+            tlines.emplace_back(*lineP);
+            cnt++;
         }
-        if (valid)
-            lineP++;
-        else
-            lineP = lines.erase(lineP);
     }
+    lines = tlines;
 #endif
 
-#if 1
+#if 0
     // expand
     for (lineP = lines.begin(); lineP != lines.end(); lineP++)
     {
@@ -470,37 +570,44 @@ void cvtLineDetection(
             // start
             ept = tstart;
             edgCnt = 0;
-            while( ept->p > 0){
+            while (ept->p > 0)
+            {
                 ept = edges.begin() + (ept->p - 1);
                 dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
-                if( dis < 0.4){
+                if (dis < 0.4)
+                {
                     tstart = ept;
                     edgCnt++;
-                } else{
+                }
+                else
+                {
                     break;
                 }
             }
             // end
             ept = tend;
-            while( ept->s > 0){
+            while (ept->s > 0)
+            {
                 ept = edges.begin() + (ept->s - 1);
                 dis = fabsf((dx * (tstart->yf - ept->yf)) - (dy * (tstart->xf - ept->xf))) / norm;
-                if( dis < 0.4){
+                if (dis < 0.4)
+                {
                     tend = ept;
                     edgCnt++;
-                } else{
+                }
+                else
+                {
                     break;
                 }
             }
         }
         lineP->start = std::distance(edges.begin(), tstart) + 1;
-        lineP->end =  std::distance(edges.begin(), tend) + 1;
+        lineP->end = std::distance(edges.begin(), tend) + 1;
         lineP->nofEdges += edgCnt;
-
     }
 #endif
 
-    _ptime.cvtLineDetection = cvtTimerEnd(); 
+    _ptime.cvtLineDetection = cvtTimerEnd();
 }
 
 /**
@@ -509,16 +616,15 @@ void cvtLineDetection(
 void cvtLinkEdges(
     std::vector<edge> &edges,
     std::vector<grad_float> &gradI,
-    float thLow,
-    float thHigh,
+    float th,
     uint32_t rows,
     uint32_t cols)
 {
 
     uint32_t i, j, nofEdges = edges.size();
-    float dr, dq, a1, a2;
+    float a1;
     uint32_t x, y, xp, yp, c, pid;
-    uint32_t di, dj, predecessor, cnt = 0;
+    uint32_t di, dj, predecessor;
 
     cvtTimerStart();
 
@@ -542,7 +648,7 @@ void cvtLinkEdges(
                 xp = x + ((uint32_t)_lx[dj]);
                 yp = y + ((uint32_t)_ly[dj]);
                 c = yp * cols + xp;
-                if (gradI[c].edg > 0 && gradI[c].mag >= thLow)
+                if (gradI[c].edg > 0 && gradI[c].mag >= th)
                 {
                     pid = gradI[c].edg - 1;
                     if (edges[pid].p == 0 && (edges[pid].s - 1) != i)
@@ -556,8 +662,7 @@ void cvtLinkEdges(
         }
     }
 
-    _ptime.cvtLinkEdges = cvtTimerEnd(); 
-
+    _ptime.cvtLinkEdges = cvtTimerEnd();
 }
 
 /**
@@ -569,15 +674,14 @@ void cvtLinkContours(
     float th)
 {
 
-    uint32_t i, j, i0, i1, nofEdges = edges.size();
-    uint32_t cnt = 0, nofConts;
-    int xi1, yi1, xj0, yj0;
+    uint32_t i, i0, i1, nofEdges = edges.size();
+    uint32_t cnt = 0, tcnt = 0;
     float mag;
 
     cvtTimerStart();
 
     conts.resize(nofEdges);
-    std::fill(conts.begin(), conts.end(), contour{0, 0, 0});
+    //std::fill(conts.begin(), conts.end(), contour{0, 0, 0});
 
     for (i = 0; i < nofEdges; i++)
     {
@@ -608,19 +712,22 @@ void cvtLinkContours(
                 if (i1 == i0)
                     break;
             }
+            // contours should have at least three points ...
             if (conts[cnt].nofEdges > 2)
             {
+                // ... and the mean gradient magnitude should be greater
+                // than the gradient threshold
                 mag /= (float)(conts[cnt].nofEdges);
                 if (mag > th)
                     cnt++;
+                else
+                    tcnt++;
             }
         }
     }
     conts.resize(cnt);
-    _ptime.cvtLinkContours = cvtTimerEnd(); 
-
+    _ptime.cvtLinkContours = cvtTimerEnd();
 }
-
 
 void cvtEdgHistogram(
     std::vector<edge> &edges,
@@ -680,11 +787,11 @@ void cvtEdgLinkHistogram(
  *
  */
 void cvtEdgCurv2RGBA(
-    std::vector<edge> &edges, 
-    uint8_t *outRGBA, 
-    uint32_t rows, 
-    uint32_t cols, 
-    uint32_t xoff, 
+    std::vector<edge> &edges,
+    uint8_t *outRGBA,
+    uint32_t rows,
+    uint32_t cols,
+    uint32_t xoff,
     uint32_t yoff)
 {
     float cur;
@@ -700,7 +807,7 @@ void cvtEdgCurv2RGBA(
         yi = yi + yoff;
         if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
         {
-            // 
+            //
             cur = edges[i].curv;
             if (cur < 0.00001f)
             {
@@ -708,7 +815,7 @@ void cvtEdgCurv2RGBA(
             }
             else
             {
-                val = (uint8_t) (cur*20.0f);
+                val = (uint8_t)(cur * 50.0f);
                 val = val > 255 ? 255 : val;
                 if (val >= 128)
                 {
@@ -737,11 +844,12 @@ void cvtEdgCurv2RGBA(
  *
  */
 void cvtEdgPts2RGBA(
-    std::vector<edge> &edges, 
-    uint8_t *outRGBA, 
-    uint32_t rows, 
-    uint32_t cols, 
-    uint32_t xoff, 
+    std::vector<edge> &edges,
+    uint8_t *outRGBA,
+    uint8_t mode,
+    uint32_t rows,
+    uint32_t cols,
+    uint32_t xoff,
     uint32_t yoff)
 {
     float dir, h, f;
@@ -758,60 +866,65 @@ void cvtEdgPts2RGBA(
         yi = yi + yoff;
         if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
         {
-            // Normalize angle to [0.0, 360.0) range
-            dir = fmodf(edges[i].dir, 360.0f);
-            /*
-            if (dir < 0.0f)
+            switch (mode)
             {
-                dir += 360.0f;
-            }
-            */
-            // Scale angle to 0.0 - 6.0 range (representing 6 color segments)
-            h = dir / 60.0f;
-            sector = (int)h;
-            f = h - (float)sector; // Fractional part
+            case 1:
+                // Normalize angle to [0.0, 360.0) range
+                dir = fmodf(edges[i].dir, 360.0f);
+                // Scale angle to 0.0 - 6.0 range (representing 6 color segments)
+                h = dir / 60.0f;
+                sector = (int)h;
+                f = h - (float)sector; // Fractional part
 
-            q = (uint8_t)((1.0f - f) * 255.0f);
-            t = (uint8_t)(f * 255.0f);
+                q = (uint8_t)((1.0f - f) * 255.0f);
+                t = (uint8_t)(f * 255.0f);
 
-            switch (sector)
-            {
-            case 0: // Red to Yellow (0° - 60°)
-                r = 255;
-                g = t;
-                b = 0;
+                switch (sector)
+                {
+                case 0: // Red to Yellow (0° - 60°)
+                    r = 255;
+                    g = t;
+                    b = 0;
+                    break;
+                case 1: // Yellow to Green (60° - 120°)
+                    r = q;
+                    g = 255;
+                    b = 0;
+                    break;
+                case 2: // Green to Cyan (120° - 180°)
+                    r = 0;
+                    g = 255;
+                    b = t;
+                    break;
+                case 3: // Cyan to Blue (180° - 240°)
+                    r = 0;
+                    g = q;
+                    b = 255;
+                    break;
+                case 4: // Blue to Magenta (240° - 300°)
+                    r = t;
+                    g = 0;
+                    b = 255;
+                    break;
+                default: // Magenta to Red (300° - 360°)
+                    r = 255;
+                    g = 0;
+                    b = q;
+                    break;
+                }
+                p = yi * (channels * cols);
+                p = p + (channels * xi);
+                outRGBA[p] = r;
+                outRGBA[p + 1] = g;
+                outRGBA[p + 2] = b;
                 break;
-            case 1: // Yellow to Green (60° - 120°)
-                r = q;
-                g = 255;
-                b = 0;
-                break;
-            case 2: // Green to Cyan (120° - 180°)
-                r = 0;
-                g = 255;
-                b = t;
-                break;
-            case 3: // Cyan to Blue (180° - 240°)
-                r = 0;
-                g = q;
-                b = 255;
-                break;
-            case 4: // Blue to Magenta (240° - 300°)
-                r = t;
-                g = 0;
-                b = 255;
-                break;
-            default: // Magenta to Red (300° - 360°)
-                r = 255;
-                g = 0;
-                b = q;
+            default:
+                p = channels * (yi * cols + xi);
+                outRGBA[p] = 0;
+                outRGBA[p + 1] = 0;
+                outRGBA[p + 2] = 0;
                 break;
             }
-            p = yi * (channels * cols);
-            p = p + (channels * xi);
-            outRGBA[p] = r;
-            outRGBA[p + 1] = g;
-            outRGBA[p + 2] = b;
         }
     }
 }
@@ -845,16 +958,15 @@ void cvtGauss5x5(
     uint32_t cols)
 {
     uint32_t c, size, c0, c1;
-    uint32_t cols2 = 2*cols;
+    uint32_t cols2 = 2 * cols;
     float val;
-    
-    cvtTimerStart();
-    
-    // Inform compiler pointers do not overlap (alias)
-    const float* __restrict in = inI32F.data();
-    float* __restrict tmp = tmpI32F.data();
-    float* __restrict out = outI32F.data();
 
+    cvtTimerStart();
+
+    // Inform compiler pointers do not overlap (alias)
+    const float *__restrict in = inI32F.data();
+    float *__restrict tmp = tmpI32F.data();
+    float *__restrict out = outI32F.data();
 
     const float g0 = gmask32F[0];
     const float g1 = gmask32F[1];
@@ -866,30 +978,30 @@ void cvtGauss5x5(
     // filter in x-direction
     c0 = 2;
     c1 = size - 2;
-    #pragma omp simd
+#pragma omp simd
     for (c = c0; c < c1; c++)
     {
-        tmp[c] = in[c - 2] * g0 + 
-                 in[c - 1] * g1 + 
-                 in[c] * g2 + 
-                 in[c + 1] * g3 + 
+        tmp[c] = in[c - 2] * g0 +
+                 in[c - 1] * g1 +
+                 in[c] * g2 +
+                 in[c + 1] * g3 +
                  in[c + 2] * g4;
     }
 
     // filter in y-direction
     c0 = 2 * cols;
     c1 = size - (2 * cols);
-    #pragma omp simd
+#pragma omp simd
     for (c = c0; c < c1; c++)
     {
         out[c] = tmp[c - cols2] * g0 +
-                tmp[c - cols] * g1 + 
-                tmp[c] * g2 + 
-                tmp[c + cols] * g3 +
-                tmp[c + cols2] * g4;
+                 tmp[c - cols] * g1 +
+                 tmp[c] * g2 +
+                 tmp[c + cols] * g3 +
+                 tmp[c + cols2] * g4;
     }
 
-    _ptime.cvtGauss5x5 = cvtTimerEnd(); 
+    _ptime.cvtGauss5x5 = cvtTimerEnd();
 }
 
 /**
@@ -900,46 +1012,45 @@ void cvtGauss5x5(
 void cvtGrad(
     std::vector<float> &inI32F,
     std::vector<grad_float> &gradI32F,
-    float th,
     uint32_t rows,
     uint32_t cols)
 {
-    float th_sq = th*th;
-    float RAD_TO_DEG = 57.295779513f; //180. / ((float)(atan(1.0) * 4.));;
-    int  x,y,yc;
-    int colsm3 = cols-3;
-    int rowsm3 = rows-3;
-    
+    float RAD_TO_DEG = 57.295779513f; // 180. / ((float)(atan(1.0) * 4.));;
+    int x, y, yc;
+    int colsm3 = cols - 3;
+    int rowsm3 = rows - 3;
+
     cvtTimerStart();
 
     // work
-    
-    for (y = 3; y < rowsm3; y++)
+    yc = 2 * cols;
+    for (y = 3; y < rowsm3; ++y)
     {
-        yc = y*cols;
-        const float* __restrict in0 = inI32F.data() + yc - cols;
-        const float* __restrict in1 = inI32F.data() + yc;
-        const float* __restrict in2 = inI32F.data() + yc + cols;
-        grad_float* __restrict out = gradI32F.data() + yc;
-    
-        #pragma omp simd
+        yc += cols;
+        const float *__restrict ind = inI32F.data() + yc - cols;
+        const float *__restrict inl = inI32F.data() + yc - 1;
+        const float *__restrict inr = inI32F.data() + yc + 1;
+        const float *__restrict inu = inI32F.data() + yc + cols;
+        grad_float *__restrict out = gradI32F.data() + yc;
+
+#pragma omp simd
         for (x = 3; x < colsm3; x++)
         {
-            float dx = 0.5f * (in1[x + 1] - in1[x - 1]);
-            float dy = 0.5f * (in2[x] - in0[x]);
-            float mv_sq = dx * dx + dy * dy;
-            float mv = 0, dv = 0;
-            if (mv_sq > th_sq)
+            float dx = 0.5f * (inr[x] - inl[x]);
+            float dy = 0.5f * (inu[x] - ind[x]);
+            float mv = dx * dx + dy * dy;
+            float dv = 0;
+            if (mv > 4)
             {
-                mv = std::sqrt(mv_sq);
+                mv = std::sqrt(mv);
                 // atan2f between [-180, 180]
                 dv = (std::atan2(dy, dx) * RAD_TO_DEG) + 180.0f;
                 // grad dir values [0, 360]
             }
-            out[x] = {dx, dy, mv, dv, 0};
+            out[x] = {mv, dv, 0};
         }
     }
-     _ptime.cvtGrad = cvtTimerEnd(); 
+    _ptime.cvtGrad = cvtTimerEnd();
 }
 
 /**
@@ -970,12 +1081,12 @@ void cvtInitGMask32F(float sigma, std::vector<float> &gmask32F, uint32_t size)
  *
  */
 void cvtLines2RGBA(
-    std::vector<line> &lines, 
-    std::vector<edge> &edges, 
-    uint8_t *outRGBA, 
-    uint32_t rows, 
-    uint32_t cols, 
-    uint32_t xoff, 
+    std::vector<line> &lines,
+    std::vector<edge> &edges,
+    uint8_t *outRGBA,
+    uint32_t rows,
+    uint32_t cols,
+    uint32_t xoff,
     uint32_t yoff)
 {
     uint8_t val, r, g, b;
@@ -987,19 +1098,23 @@ void cvtLines2RGBA(
 
     for (auto i = 0; i < nofLines; i++)
     {
-        edgS = edges[ lines[i].start - 1];
         nofEdges = lines[i].nofEdges;
+        if(nofEdges == 0) continue;
+        edgS = edges[lines[i].start - 1];
         c = 0;
-        for( c=0; c<nofEdges; c++){
+        for (c = 0; c < nofEdges; c++)
+        {
             xi = edgS.xi + xoff;
             yi = edgS.yi + yoff;
-            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows){
+            if (xi >= 0 && xi < cols && yi >= 0 && yi < rows)
+            {
                 p = yi * (channels * cols) + (channels * xi);
-                outRGBA[p] = 0x00;
+                outRGBA[p] = 0xFF;
                 outRGBA[p + 1] = 0x00;
                 outRGBA[p + 2] = 0xFF;
             }
-            if( edgS.s > 0) edgS = edges[ edgS.s - 1];
+            if (edgS.s > 0)
+                edgS = edges[edgS.s - 1];
         }
     }
 }
@@ -1043,44 +1158,41 @@ void cvtRGBA2Grey(uint8_t *inRGBA, std::vector<float> &greyI32F, uint32_t size)
 {
     cvtTimerStart();
 
-    const uint8_t * __restrict in = inRGBA;
-    float * __restrict out = greyI32F.data();
+    const uint8_t *__restrict in = inRGBA;
+    float *__restrict out = greyI32F.data();
 
     // Standard ITU-R BT.601 luminance coefficients
     constexpr float Wr = 0.2989f;
     constexpr float Wg = 0.5870f;
     constexpr float Wb = 0.1140f;
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (uint32_t i = 0; i < size; i++)
     {
         uint32_t idx = i * 4;
-        out[i] = static_cast<float>(in[idx])     * Wr +
+        out[i] = static_cast<float>(in[idx]) * Wr +
                  static_cast<float>(in[idx + 1]) * Wg +
                  static_cast<float>(in[idx + 2]) * Wb;
     }
 
-    _ptime.cvtRGBA2Grey = cvtTimerEnd(); 
+    _ptime.cvtRGBA2Grey = cvtTimerEnd();
 }
 
 void cvtVal2RGBA(uint8_t val, uint8_t *outRGBA, uint32_t size)
 {
     cvtTimerStart();
 
-    uint8_t * __restrict out = outRGBA;
+    uint8_t *__restrict out = outRGBA;
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (uint32_t i = 0; i < size; i++)
     {
         uint32_t idx = i * 4;
         out[idx] = val;
-        out[idx+1] = val;
-        out[idx+2] = val;
+        out[idx + 1] = val;
+        out[idx + 2] = val;
     }
-
 }
-
-
 
 /**
  *
@@ -1099,11 +1211,8 @@ void cvtInitImgLevels(std::vector<imgLevel> &iLevelL, uint32_t rows, uint32_t co
         iLevelL[i].gradI_float.resize(size);
         iLevelL[i].edgesL.resize(size);
         iLevelL[i].contoursL.resize(size);
-        iLevelL[i].linesL.resize(size);
         iLevelL[i].histEdges.resize(256);
     }
-
-
 }
 
 /**
@@ -1167,22 +1276,25 @@ void cvtCopyI32F2RGBA(
 }
 
 /**
- * 
+ *
  */
-void cvtTimerStart(){
+void cvtTimerStart()
+{
     _start = std::chrono::system_clock::now();
 }
 
-double cvtTimerEnd(){
+double cvtTimerEnd()
+{
     std::chrono::time_point<std::chrono::system_clock> end;
-    end  = std::chrono::system_clock::now();
+    end = std::chrono::system_clock::now();
 
     std::chrono::duration<double, std::milli> duration = end - _start;
 
-    return(duration.count());
+    return (duration.count());
 }
 
-void cvtTimerValues(processTime *pTime){
+void cvtTimerValues(processTime *pTime)
+{
     pTime->cvtGauss5x5 = _ptime.cvtGauss5x5;
     pTime->cvtRGBA2Grey = _ptime.cvtRGBA2Grey;
     pTime->cvtGrad = _ptime.cvtGrad;

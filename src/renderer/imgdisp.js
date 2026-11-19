@@ -293,21 +293,19 @@ class imgdisp {
                     yi = edges[i0 - 1].yi;
 
                     val = edges[i0 - 1].curv;
-                    if( val < 0) {
-                        r = g = b = 0;
+                    if( val <= 0.0001) val = 0;
+                    else val = parseInt( (50*Math.log10(val)+128) ); //255*val/360);
+                    val = val < 0 ? 0 : val;
+                    val = val > 255 ? 255 : val;
+                    if( val >= 128 ){
+                        r = 255;
+                        g = 255-(2*(val-128));
+                        b = 0x00;
                     } else {
-                        val = parseInt(20*val) //255*val/360);
-                        val = val > 255 ? 255 : val;
-                        if( val >= 128 ){
-                            r = 255;
-                            g = 255-(2*(val-128));
-                            b = 0x00;
-                        } else {
-                            r = 2 * val;
-                            g = 255; ;
-                            b = 0x00;
-                        }                        
-                    }
+                        r = 2 * val;
+                        g = 255; ;
+                        b = 0x00;
+                    }                        
                     ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
                     ctx.fillRect(xi, yi, 2, 2); // Draws a 1x1 rectangle at (50, 100)
                     i0 = edges[i0 - 1].s;

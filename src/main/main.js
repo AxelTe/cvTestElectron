@@ -17,8 +17,8 @@ let runMode = 0;
 // 
 const createWindow = () => {
   mainWin = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 600,
+    height: 400,
     icon: path.join(__dirname, '../renderer/logo1.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js')
@@ -30,7 +30,7 @@ const createWindow = () => {
   mainWin.webContents.on('did-finish-load', () => {
     console.log("main browser window ready");
     sendInfoToMainGUI({"dispConfig": config.imgDisp});
-    imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh, config.curvBd);
+    imgseq.start(config.imgseq, config.processing);
   });
 
   mainWin.on("close", () => {
@@ -92,7 +92,7 @@ app.whenReady().then(() => {
   })
 
   createWindow();
-  if(config.imagePyramids > 1) createPyramidWin();
+  if(config.processing.imagePyramids > 1) createPyramidWin();
 
 })
 
@@ -123,7 +123,7 @@ ipcMain.handle('dialog:openFile', async () => {
       }
       config.imgseq.path = tstr;
       config.imgseq.seqname = tstr1[tstr1.length - 1];
-      imgseq.start(config.imgseq, config.imagePyramids, config.gradThLow, config.gradThHigh, config.curvBd);
+      imgseq.start(config.imgseq, config.processing.imagePyramids);
       try {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
       } catch (error) {
@@ -178,9 +178,14 @@ ipcMain.on('loadFromRoot', (event, data) => {
       case "loadFromRoot":
         imgseq.loadImg(data.id, data.rows, data.cols);
         break;
-    }
+      case "newGradThLow":
+        config.processing.gradThLow = parseFloat(data.value);
+        imgseq.setParameters(config.processing);
+        break;
+      default:
+          break;
+    } 
   }
-  
 });
 
 
@@ -199,7 +204,7 @@ imgseq.on("imgseqInfo", function (msg) {
   if (msg.hasOwnProperty("processTime")) {
     sendInfoToMainGUI(msg);
     imgseq.showImg(4);
-    if(config.imagePyramids>1) imgseq.showImg(12);
+    if(config.processing.imagePyramids>1) imgseq.showImg(12);
     if(runMode !== 2){
       imgseq.getEdgeData();
       imgseq.getTimerValues();

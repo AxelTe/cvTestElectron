@@ -11,8 +11,11 @@ class mouseOnCanvas {
     #zoomLevel = 5.0;
     #magSize = 150.0;
     #sourceSize = this.#magSize / this.#zoomLevel;
+    #selectDispBtn = undefined;
     #contourBtn = undefined;
     #magnifierBtn = undefined;
+    #dirHistBtn = undefined;
+    #edgeHistBtn = undefined;
     #gradDirBtns = [];
     #gradDirFields = [];
     #handleMouseMove = null;
@@ -171,34 +174,39 @@ class mouseOnCanvas {
         this.#gradDirBtns = [];
         this.#gradDirFields = [];
         //
-        self.#contourBtn = el.appendChild(document.createElement('button'));
-        self.#contourBtn.innerText = "edges - contours - direction";
-        self.#contourBtn.addEventListener("click", (event) => self.onContourBtn(self, event));
+        self.#selectDispBtn = el.appendChild(document.createElement('button'));
+        self.#selectDispBtn.innerText = "edges - contours - direction";
+        self.#selectDispBtn.addEventListener("click", (event) => self.onsSelectDispBtn(self, event));
         //
         self.#magnifierBtn = el.appendChild(document.createElement('button'));
         self.#magnifierBtn.innerText = "magnify";
         self.#magnifierBtn.addEventListener("click", (event) => self.onMagnifierBtn(self, event));
         //
+        self.#contourBtn = el.appendChild(document.createElement('button'));
+        self.#contourBtn.innerText = "contour";
+        self.#contourBtn.addEventListener("click", (event) => self.onContourBtn(self.#mouseX, self.#mouseY, self, event));
+        //
         self.#gradBtn = el.appendChild(document.createElement('button'));
         self.#gradBtn.innerText = "gradient";
         self.#gradBtn.addEventListener("click", (event) => self.onGradBtn(self.#mouseX, self.#mouseY, self, event));
         //
-        self.#contourBtn = el.appendChild(document.createElement('button'));
-        self.#contourBtn.innerText = "dir-histogram";
-        self.#contourBtn.addEventListener("click", (event) => self.onDirHistBtn(self, event));
+        self.#dirHistBtn = el.appendChild(document.createElement('button'));
+        self.#dirHistBtn.innerText = "dir-histogram";
+        self.#dirHistBtn.addEventListener("click", (event) => self.onDirHistBtn(self, event));
         //
-        self.#contourBtn = el.appendChild(document.createElement('button'));
-        self.#contourBtn.innerText = "edge-histogram";
-        //self.#contourBtn.addEventListener("click", (event) => self.onEdgeHistBtn(self, event));
-        self.#contourBtn.addEventListener("click", (event) => self.onCurvHistBtn(self, event));
+        /*
+        self.#edgeHistBtn = el.appendChild(document.createElement('button'));
+        self.#edgeHistBtn.innerText = "edge-histogram";
+        self.#edgeHistBtn.addEventListener("click", (event) => self.onEdgeHistBtn(self, event));
+        */
         //
         self.#backBtn = el.appendChild(document.createElement('button'));
         self.#backBtn.innerText = "back";
         self.#backBtn.addEventListener("click", (event) => self.offContextMenu(self, event));
     }
 
-    onContourBtn(self, event) {
-        console.log("onContourBtn");
+    onsSelectDispBtn(self, event) {
+        console.log("onsSelectDispBtn");
         self.#handleMouseMove = (event) => this.onMouseMove(this, event);
 
         self.imgDisp.config.edgeMode = (self.imgDisp.config.edgeMode + 1) % 4;
@@ -228,6 +236,33 @@ class mouseOnCanvas {
         this.offContextMenu(self, event);
     }
 
+    onContourBtn(x, y, self, event) {
+        console.log("onContourBtn");
+        let x0 = Math.round(x * (self.#cvin.width / self.#cvin.clientWidth));
+        let y0 = Math.round(y * (self.#cvin.height / self.#cvin.clientHeight));
+        let conts = self.imgDisp.edgeData.conts;
+        let edges = self.imgDisp.edgeData.edges;
+        console.log("onContourBtn",x0,y0,edges.length,conts.length);
+        let mindis = 10.;
+        let minid = 0;
+        for(let i=0; i<edges.length;++i){
+            let dx = edges[i].xi - x0;
+            let dy = edges[i].yi - y0;
+            let dis = Math.sqrt( dx*dx + dy*dy );
+            if(dis < mindis){
+                mindis = dis;
+                minid = i+1;
+            }
+        }
+        if(minid>0){
+            console.log("contour: ", conts[edges[minid-1].c - 1]);
+            this.contour(conts[edges[minid-1].c - 1]);
+        }
+
+        this.offContextMenu(self, event);
+    }
+
+
     onGradBtn(x, y, self, event) {
         console.log("onGradBtn");
         let x0 = Math.round(x * (self.#cvin.width / self.#cvin.clientWidth));
@@ -236,7 +271,7 @@ class mouseOnCanvas {
         this.offContextMenu(self, event);
     }
 
-    onCurvHistBtn(self, event) {
+    onEdgHistBtn(self, event) {
         console.log("onCurvHistBtn");
         //
         let edges = self.imgDisp.edgeData.edges;
@@ -563,4 +598,92 @@ class mouseOnCanvas {
             self.#cvout.style.display = 'none';
         }
     };
+
+    /**
+     * 
+     * @param {*} self 
+     * @param {*} e 
+     */
+    contour(cont) {
+        this.#cvout.style.display = 'block';
+        let edges = this.imgDisp.edgeData.edges;
+
+        let y0=1000,x0=1000;
+        let y1=0,x1=0;
+        let edg = edges[cont.start-1];
+        let dx = edges[cont.end-1].xf - edges[cont.start-1].xf;
+        let dy = edges[cont.end-1].yf - edges[cont.start-1].yf;
+        let len = Math.sqrt(dx * dx + dy * dy);
+        let vx,vy, cross;
+        for(let i=0; i<cont.nofEdges;i++){
+            x0 = x0<edg.xi ? x0 : edg.xi;
+            y0 = y0<edg.yi ? y0 : edg.yi;
+            x1 = x1>edg.xi ? x1 : edg.xi;
+            y1 = y1>edg.yi ? y1 : edg.yi;
+
+            vx = edg.xf - edges[cont.start-1].xf;
+            vy = edg.yf - edges[cont.start-1].yf;
+            cross = (vx * dy - vy * dx)/len;
+            console.log( edg.xi, edg.yi, "-", edg.xf.toFixed(1), edg.yf.toFixed(1), "-", vx.toFixed(2), vy.toFixed(2), "-",  cross.toFixed(3));
+
+            if(edg.s>0) edg = edges[edg.s-1];
+        }
+
+        dx = Math.abs(x1-x0);
+        dy = Math.abs(y1-y0);
+        let xc = x0 + 0.5*dx;
+        let yc = y0 + 0.5*dy;
+        let sc = dx>dy ? this.#magSize/(dx+4) : this.#magSize/(dy+4);
+        edg = edges[cont.end-1];
+        x1 = edg.xi;
+        y1 = edg.yi;
+        x0 = edg.xi;
+        y0 = edg.yi;
+        let x,y;
+        this.#magCtx.clearRect(0, 0, this.#magSize, this.#magSize);
+
+        this.#magCtx.fillStyle = "#FF0000"
+        edg = edges[cont.start-1];
+        for(let i=0; i<cont.nofEdges;i++){
+            x = sc*(edg.xi - xc) + this.#magSize/2;
+            y = sc*(edg.yi - yc) + this.#magSize/2;
+            this.#magCtx.fillRect(x-1, y-1, 3, 3);
+            //
+            if(edg.s>0) edg = edges[edg.s-1];
+        }
+
+        this.#magCtx.fillStyle = "#0000FF"
+        edg = edges[cont.start-1];
+        for(let i=0; i<cont.nofEdges;i++){
+            x = sc*(edg.xf - xc) + this.#magSize/2;
+            y = sc*(edg.yf - yc) + this.#magSize/2;
+            this.#magCtx.fillRect(x-0.5, y-0.5, 1, 1);
+            //
+            if(edg.s>0) edg = edges[edg.s-1];
+        }
+        
+        this.#magCtx.fillStyle = "#00FFFF"
+        edg = edges[cont.start-1];
+        x = sc*(edg.xf - xc) + this.#magSize/2;
+        y = sc*(edg.yf - yc) + this.#magSize/2;
+        this.#magCtx.fillRect(x-1, y-1, 3, 3);
+
+        this.#magCtx.fillStyle = "#FFFF00"
+        edg = edges[cont.end-1];
+        x = sc*(edg.xf - xc) + this.#magSize/2;
+        y = sc*(edg.yf - yc) + this.#magSize/2;
+        this.#magCtx.fillRect(x-1, y-1, 3, 3);
+
+        this.#magCtx.strokeStyle = "#101010"
+        edg = edges[cont.start-1];
+        x0 = sc*(edg.xf - xc) + this.#magSize/2;
+        y0 = sc*(edg.yf - yc) + this.#magSize/2;
+        edg = edges[cont.end-1];
+        x1 = sc*(edg.xf - xc) + this.#magSize/2;
+        y1 = sc*(edg.yf - yc) + this.#magSize/2;
+        this.#magCtx.beginPath();
+        this.#magCtx.moveTo(x0,y0);
+        this.#magCtx.lineTo(x1,y1);
+        this.#magCtx.stroke();
+   };
 }

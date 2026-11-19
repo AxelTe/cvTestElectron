@@ -28,10 +28,12 @@ class imgseq extends EventEmitter {
         this.#imgInfo = undefined;
         this.rows = 0;
         this.cols = 0;
-        this.nofLevels = 0;
-        this.gradThLow = 0.0;
-        this.gradThHigh = 0.0;
+        this.nofLevels = 1;
+        this.gradThLow = 10.0;
+        this.gradThHigh = 20.0;
         this.curvBd = 10;
+        this.curvTh = 0.6;
+        this.lineTh = 0.6;
         this.id = -1;
     }
 
@@ -64,29 +66,31 @@ class imgseq extends EventEmitter {
 
     /**
      * 
-     * @param {*} config 
-     * @param {string} config.path "path name"
-     * @param {string} config.seqname "name of seq. info file inside path"
-     * @param {number} config.last "id of last processed image"
-     * @param {number} config.imgArrLen "size of internal image array"
+     * @param {*} imgseq 
+     * @param {string} imgseq.path "path name"
+     * @param {string} imgseq.seqname "name of seq. info file inside path"
+     * @param {number} imgseq.last "id of last processed image"
+     * @param {number} imgseq.imgArrLen "size of internal image array"
      * @returns {void}
      */
-    start(config, nofLevels, gradThLow, gradThHigh, curvBd) {
+    start(imgseq, processing) {
         let valid = true;
-        if (config.hasOwnProperty("path")) this.path = config.path;
+        if (imgseq.hasOwnProperty("path")) this.path = imgseq.path;
         else valid = false;
-        if (config.hasOwnProperty("seqname")) this.seqname = config.seqname;
+        if (imgseq.hasOwnProperty("seqname")) this.seqname = imgseq.seqname;
         else valid = false;
-        if (config.hasOwnProperty("last")) this.last = config.last;
+        if (imgseq.hasOwnProperty("last")) this.last = imgseq.last;
         else valid = false;
         if (valid === false) {
-            this.emit("imgseqError", "no correct sequence definition in config data");
+            this.emit("imgseqError", "no correct sequence definition in imgseq data");
             return;
         }
-        this.nofLevels = nofLevels;
-        this.gradThHigh = gradThHigh;
-        this.gradThLow = gradThLow;
-        this.curvBd = curvBd;
+        if( processing.hasOwnProperty("nofLevels")) this.nofLevels = processing.nofLevels;
+        if( processing.hasOwnProperty("gradThHigh")) this.gradThHigh = processing.gradThHigh;
+        if( processing.hasOwnProperty("gradThLow")) this.gradThLow = processing.gradThLow;
+        if( processing.hasOwnProperty("curvBd")) this.curvBd = processing.curvBd;
+        if( processing.hasOwnProperty("curvTh")) this.curvTh = processing.curvTh;
+        if( processing.hasOwnProperty("lineTh")) this.lineTh = processing.lineTh;
 
         let fname = this.path + "\\" + this.seqname;
         console.log("imgseq.start:", fname);
@@ -108,8 +112,8 @@ class imgseq extends EventEmitter {
             //@@@ console.log("imgseq.start: ", this.seqinfo);
 
             try {
-                console.log("myAddon.initialize", this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd)
-                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd);
+                console.log("myAddon.initialize", this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd, this.curvTh, this.lineTh)
+                const result = myAddon.initialize(this.seqinfo.rows, this.seqinfo.cols, this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd, this.curvTh, this.lineTh);
                 console.log("imgseq.loadImg()> myAddon.initialize() returned: ", result);
 
             } catch (error) {
@@ -118,6 +122,29 @@ class imgseq extends EventEmitter {
 
             this.emit("imgseqInfo", { seqname: this.seqname, seqinfo: this.seqinfo });
         });
+    }
+
+    /**
+     * 
+     */
+    setParameters(processing) {
+        
+        console.log("imgseq.setParameters");
+        
+        if( processing.hasOwnProperty("nofLevels")) this.nofLevels = processing.nofLevels;
+        if( processing.hasOwnProperty("gradThHigh")) this.gradThHigh = processing.gradThHigh;
+        if( processing.hasOwnProperty("gradThLow")) this.gradThLow = processing.gradThLow;
+        if( processing.hasOwnProperty("curvBd")) this.curvBd = processing.curvBd;
+        if( processing.hasOwnProperty("curvTh")) this.curvTh = processing.curvTh;
+        if( processing.hasOwnProperty("lineTh")) this.lineTh = processing.lineTh;
+
+        try {
+            console.log("myAddon.setParameter", this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd, this.curvTh, this.lineTh)
+            const result = myAddon.setParameter(this.nofLevels, this.gradThLow, this.gradThHigh, this.curvBd, this.curvTh, this.lineTh);
+            console.log("imgseq.loadImg()> myAddon.setParameter() returned: ", result);
+        } catch (error) {
+            console.log("imgseq.setParameter()> Error: ", error);
+        }
     }
 
     /**

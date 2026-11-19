@@ -1,46 +1,79 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'"
-    />
-    <meta
-      http-equiv="X-Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'"
-    />
-    <title>CV Test App</title>
-    <link rel="stylesheet" type="text/css" href="index.css">
-  </head>
-  <body>
-    <div id="btnLine" class="tableRow">
-      <button id="InputBtn" class="tableElemBtn">Input</button>
-      <button id="lastBtn" class="tableElemBtn2">&larr;</button>
-      <button id="runBtn" class="tableElemBtn2">&#9654;</button>
-      <button id="nextBtn" class="tableElemBtn2">&rarr;</button>  
-      <button id="resetBtn" class="tableElemBtn2">&#8635;</button>  
-    </div>
-    <div id="mainFrame">
-      <canvas id="incv"></canvas>
-    </div>
-    <div id="footLine" class="tableRow">
-      <div id="footLeft" class="tableElem">xxx</div>
-      <div id="footCenter" class="tableElem"></div>
-      <div id="footRight" class="tableElem">
-        <label for="Disp">disp:</label>
-        <progress id="DispBar" value="0" max="100"> 0% </progress>
-      </div>
-    </div>
 
-    <canvas id="magnifier" width="150" height="150"></canvas>
-    <div id="mouseCtx" class="popup"></div>
-    <div id="gradientInfo" class="popup">Gradient</div>
-    <canvas id="histograms" width="300" height="150"></canvas>
-    
-  </body>
-   <script src="./chart.umd.js"></script>
-  <script src="./imgdisp.js"></script>
-  <script src="./mouseOnCanvas.js"></script>
-  <script src="./renderer.js"></script>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+  <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+  <title>CV Test App</title>
+  <link rel="stylesheet" type="text/css" href="index.css">
+</head>
+
+<body>
+  <div id="btnLine" class="tableRow">
+    <button id="parameterBtn" class="tableElemBtn">☰ Parameter</button>
+    <button id="inputBtn" class="tableElemBtn">Input</button>
+    <button id="lastBtn" class="tableElemBtn2">&larr;</button>
+    <button id="runBtn" class="tableElemBtn2">&#9654;</button>
+    <button id="nextBtn" class="tableElemBtn2">&rarr;</button>
+    <button id="resetBtn" class="tableElemBtn2">&#8635;</button>
+  </div>
+
+  <!-- Seitenmenü -->
+  <aside class="sidebar" id="parameterSBar" aria-hidden="true">
+    <div class="tableRow" id="paramBtnLine">
+      <div>Parameter</div>
+      <button class="tableElemBtn" id="closeMenuBtn" aria-label="close parameter sidebar">&times;</button>
+    </div>
+    <div class="slider-container" id="paramMainFrame">
+      <br>
+      <div class="slider-header">
+        <label for="gradTh">gradient threshold</label>
+        <output id="gradTh" for="gradTh">10</output>
+      </div>
+      <input type="range" id="gradThSlider" min="0" max="100" value="10">
+      <br>
+      <div class="slider-header">
+        <label for="curvBd">curvarture window size</label>
+        <output id="curvBd" for="curvBd">10</output>
+      </div>
+      <input type="range" id="curvBdSlider" min="0" max="100" value="10">
+      <br>
+      <div class="slider-header">
+        <label for="curvTh">straight line curvarture threshold</label>
+        <output id="curvTh" for="curvTh">10</output>
+      </div>
+      <input type="range" id="curvThSlider" min="0" max="100" value="10">
+      <br>
+      <div class="slider-header">
+        <label for="lineTh">straight line threhold</label>
+        <output id="lineTh" for="lineTh">10</output>
+      </div>
+      <input type="range" id="lineThSlider" min="0" max="100" value="10">
+    </div>
+  </aside>
+
+  <div id="mainFrame">
+    <canvas id="incv"></canvas>
+  </div>
+  <div id="footLine" class="tableRow">
+    <div id="footLeft" class="tableElem">xxx</div>
+    <div id="footCenter" class="tableElem"></div>
+    <div id="footRight" class="tableElem">
+      <label for="Disp">disp:</label>
+      <progress id="DispBar" value="0" max="100"> 0% </progress>
+    </div>
+  </div>
+
+  <canvas id="magnifier" width="150" height="150"></canvas>
+  <div id="mouseCtx" class="popup"></div>
+  <div id="gradientInfo" class="popup">Gradient</div>
+  <canvas id="histograms" width="300" height="150"></canvas>
+
+</body>
+<script src="./chart.umd.js"></script>
+<script src="./imgdisp.js"></script>
+<script src="./mouseOnCanvas.js"></script>
+<script src="./renderer.js"></script>
+
 </html>

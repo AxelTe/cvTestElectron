@@ -15,7 +15,9 @@ static uint32_t size;
 static uint32_t nofLevels;
 static float gradThLow;
 static float gradThHigh;
+static float curvTh;
 static uint32_t curvBd;
+static float lineTh;
 
 std::vector<imgLevel> imgLevels;
 
@@ -27,9 +29,9 @@ Napi::Value initialize(const Napi::CallbackInfo &info)
     Napi::Env env = info.Env();
 
     // check input 'info' structure
-    if (info.Length() != 6)
+    if (info.Length() != 8)
     {
-        Napi::TypeError::New(env, "expected: (width, height, nofLevels, gradThLow, gradThHigh, curvBd)")
+        Napi::TypeError::New(env, "expected: (width, height, nofLevels, gradThLow, gradThHigh, curvBd, curvTh, lineTh)")
             .ThrowAsJavaScriptException();
         return env.Null();
     }
@@ -39,12 +41,15 @@ Napi::Value initialize(const Napi::CallbackInfo &info)
     gradThLow = info[3].As<Napi::Number>().FloatValue();
     gradThHigh = info[4].As<Napi::Number>().FloatValue();
     curvBd = info[5].As<Napi::Number>().Uint32Value();
+    curvTh = info[6].As<Napi::Number>().FloatValue();
+    lineTh = info[7].As<Napi::Number>().FloatValue();
     size = rows * cols;
 
     // Allocate memory on the C++ heap
     gmask32F.resize(GMASKSIZE, 0);
     cvtInitGMask32F(2.0, gmask32F, GMASKSIZE);
     // nofLevels = 3;
+    imgLevels.clear();
     imgLevels.resize(nofLevels);
     cvtInitImgLevels(imgLevels, rows, cols, nofLevels);
 
@@ -95,17 +100,17 @@ Napi::Value process(const Napi::CallbackInfo &info)
     // start timer
     cvtRGBA2Grey(pixels, imgLevels[0].greyI_float, size);
     cvtGauss5x5(imgLevels[0].greyI_float, imgLevels[0].tmpI_float, imgLevels[0].gaussI_float, gmask32F, rows, cols);
-    cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, gradThLow, rows, cols);
-    cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgesL, gradThLow, gradThHigh, rows, cols);
+    cvtGrad(imgLevels[0].gaussI_float, imgLevels[0].gradI_float, rows, cols);
+    cvtEdgDetection(imgLevels[0].gradI_float, imgLevels[0].edgesL, gradThLow, rows, cols);
     returnStr += "nofedges: " + std::to_string(imgLevels[0].edgesL.size());
     cvtEdgFilter3x3(imgLevels[0].gradI_float, imgLevels[0].edgesL, rows, cols);
     returnStr += ", " + std::to_string(imgLevels[0].edgesL.size());
     cvtEdgSubPixel(imgLevels[0].gradI_float, imgLevels[0].edgesL, rows, cols);
-    cvtLinkEdges(imgLevels[0].edgesL, imgLevels[0].gradI_float, gradThLow, gradThHigh, rows, cols);
-    cvtLinkContours(imgLevels[0].edgesL, imgLevels[0].contoursL, gradThLow + 0.5 * (gradThHigh - gradThLow));
+    cvtLinkEdges(imgLevels[0].edgesL, imgLevels[0].gradI_float, gradThLow, rows, cols);
+    cvtLinkContours(imgLevels[0].edgesL, imgLevels[0].contoursL, gradThLow+2);
     returnStr += ", nofconts: " + std::to_string(imgLevels[0].contoursL.size());
-    cvtCurvatureContours(imgLevels[0].edgesL, imgLevels[0].contoursL, curvBd);
-    cvtLineDetection(imgLevels[0].edgesL, imgLevels[0].contoursL, imgLevels[0].linesL, curvBd);
+    cvtCurvatureContours(imgLevels[0].edgesL, imgLevels[0].contoursL, 5);
+    cvtLineDetection(imgLevels[0].edgesL, imgLevels[0].contoursL, imgLevels[0].linesL, curvBd/2, curvTh, lineTh);
     cvtTimerValues(&imgLevels[0].procTime);
     // cvtEdges2Contours(imgLevels[0].edgesL);
     // cvtEdgHistogram(imgLevels[0].edgesL, imgLevels[0].histEdges);
@@ -118,14 +123,14 @@ Napi::Value process(const Napi::CallbackInfo &info)
         irows >>= 1;
         cvtSubSample(imgLevels[i - 1].gaussI_float, imgLevels[i].greyI_float, irows, icols);
         cvtGauss5x5(imgLevels[i].greyI_float, imgLevels[i].tmpI_float, imgLevels[i].gaussI_float, gmask32F, irows, icols);
-        cvtGrad(imgLevels[i].gaussI_float, imgLevels[i].gradI_float, gradThLow, irows, icols);
-        cvtEdgDetection(imgLevels[i].gradI_float, imgLevels[i].edgesL, gradThLow, gradThHigh, irows, icols);
+        cvtGrad(imgLevels[i].gaussI_float, imgLevels[i].gradI_float, irows, icols);
+        cvtEdgDetection(imgLevels[i].gradI_float, imgLevels[i].edgesL, gradThLow, irows, icols);
         cvtEdgFilter3x3(imgLevels[i].gradI_float, imgLevels[i].edgesL, irows, icols);
         cvtEdgSubPixel(imgLevels[i].gradI_float, imgLevels[i].edgesL, irows, icols);
-        cvtLinkEdges(imgLevels[i].edgesL, imgLevels[i].gradI_float, gradThLow, gradThHigh, irows, icols);
-        cvtLinkContours(imgLevels[i].edgesL, imgLevels[i].contoursL, gradThLow + 0.5 * (gradThHigh - gradThLow));
+        cvtLinkEdges(imgLevels[i].edgesL, imgLevels[i].gradI_float, gradThLow, irows, icols);
+        cvtLinkContours(imgLevels[i].edgesL, imgLevels[i].contoursL,  gradThLow+2);
         cvtCurvatureContours(imgLevels[i].edgesL, imgLevels[i].contoursL, curvBd);
-        cvtLineDetection(imgLevels[i].edgesL, imgLevels[i].contoursL, imgLevels[i].linesL, curvBd);
+        cvtLineDetection(imgLevels[i].edgesL, imgLevels[i].contoursL, imgLevels[i].linesL, curvBd/2, curvTh, lineTh);
         cvtTimerValues(&imgLevels[i].procTime);
     }
 
@@ -289,6 +294,30 @@ Napi::Value getTimerValues(const Napi::CallbackInfo &info)
 /**
  *
  */
+Napi::Value setParameter(const Napi::CallbackInfo &info)
+{
+    Napi::Env env = info.Env();
+
+     // check input 'info' structure
+    if (info.Length() != 6)
+    {
+        Napi::TypeError::New(env, "expected: (nofLevels, gradThLow, gradThHigh, curvBd, curvTh, lineTh)")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+    nofLevels = info[0].As<Napi::Number>().Uint32Value();
+    gradThLow = info[1].As<Napi::Number>().FloatValue();
+    gradThHigh = info[2].As<Napi::Number>().FloatValue();
+    curvBd = info[3].As<Napi::Number>().Uint32Value();
+    curvTh = info[4].As<Napi::Number>().FloatValue();
+    lineTh = info[5].As<Napi::Number>().FloatValue();
+    
+    return Napi::String::New(env, "setParameter done");
+}
+
+/**
+ *
+ */
 Napi::Value show(const Napi::CallbackInfo &info)
 {
     Napi::Env env = info.Env();
@@ -341,7 +370,7 @@ Napi::Value show(const Napi::CallbackInfo &info)
             icols >>= 1;
             irows >>= 1;
             cvtCopyI32F2RGBA(imgLevels[i].greyI_float, irows, icols, pixels, ix0, 0, rows, cols);
-            cvtEdgPts2RGBA(imgLevels[i].edgesL, pixels, rows, cols, ix0, 0);
+            cvtEdgPts2RGBA(imgLevels[i].edgesL, pixels, 0, rows, cols, ix0, 0);
             ix0 += icols;
         }
         break;
@@ -355,7 +384,7 @@ Napi::Value show(const Napi::CallbackInfo &info)
             icols >>= 1;
             irows >>= 1;
             cvtCopyI32F2RGBA(imgLevels[i].greyI_float, irows, icols, pixels, ix0, 0, rows, cols);
-            cvtEdgPts2RGBA(imgLevels[i].edgesL, pixels, rows, cols, ix0, 0);
+            cvtEdgPts2RGBA(imgLevels[i].edgesL, pixels, 0, rows, cols, ix0, 0);
             ix0 += icols;
         }
         break;
@@ -388,22 +417,25 @@ Napi::Value show(const Napi::CallbackInfo &info)
         break;
 
     // original level
+    case 5:
+        cvtEdgCurv2RGBA( imgLevels[0].edgesL, pixels, rows, cols, 0, 0);
+        break;
     case 4:
         // edges on mag level
         cvtVal2RGBA(128, pixels, size);
-        //cvtMag2RGBA(imgLevels[0].gradI_float, pixels, size);
-        cvtEdgCurv2RGBA(imgLevels[0].edgesL, pixels, rows, cols, 0, 0);
+        cvtConts2RGBA(imgLevels[0].contoursL, imgLevels[0].edgesL, pixels, curvTh, rows, cols, 0, 0);
         cvtLines2RGBA(imgLevels[0].linesL, imgLevels[0].edgesL, pixels, rows, cols, 0, 0);
         break;
     case 3:
         // edges on mag level
-        cvtMag2RGBA(imgLevels[0].gradI_float, pixels, size);
-        cvtEdgPts2RGBA(imgLevels[0].edgesL, pixels, rows, cols, 0, 0);
+        cvtVal2RGBA(128, pixels, size);
+        cvtEdgPts2RGBA(imgLevels[0].edgesL, pixels, 0, rows, cols, 0, 0);
+        cvtConts2RGBA(imgLevels[0].contoursL, imgLevels[0].edgesL, pixels, curvTh, rows, cols, 0, 0);
         break;
     case 2:
-        // edges on grey level
+        // edges (dir-value) on grey level
         cvtGrey2RGBA(imgLevels[0].greyI_float, pixels, size);
-        cvtEdgPts2RGBA(imgLevels[0].edgesL, pixels, rows, cols, 0, 0);
+        cvtEdgPts2RGBA(imgLevels[0].edgesL, pixels, 1, rows, cols, 0, 0);
         break;
     case 1:
         // gradient magnitude
@@ -421,11 +453,12 @@ Napi::Value show(const Napi::CallbackInfo &info)
 Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     exports.Set(Napi::String::New(env, "initialize"), Napi::Function::New(env, initialize));
-    exports.Set(Napi::String::New(env, "process"), Napi::Function::New(env, process));
+    exports.Set("process", Napi::Function::New(env, process));
     exports.Set("getEdgeData", Napi::Function::New(env, getEdgeData));
     exports.Set("getHistEdges", Napi::Function::New(env, getHistEdges));
     exports.Set("getTimerValues", Napi::Function::New(env, getTimerValues));
-    exports.Set(Napi::String::New(env, "show"), Napi::Function::New(env, show));
+    exports.Set("setParameter", Napi::Function::New(env, setParameter));
+    exports.Set("show", Napi::Function::New(env, show));
     return exports;
 }
 
